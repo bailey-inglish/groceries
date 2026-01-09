@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import { toast, Toaster } from 'sonner'
-import { QRCodeSVG } from 'qrcode.react'
+import { ShoppingCart, Mail, ArrowRight, Download } from 'lucide-react'
 
 export default function LoginPage() {
   const [email, setEmail] = useState('')
@@ -167,25 +167,42 @@ export default function LoginPage() {
 
   const currentUrl = 'https://easygroceries.vercel.app'
 
-  // Desktop view - show QR code
+  // Desktop view - show website URL
   if (!isMobile) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-emerald-50 to-teal-100 p-4">
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100 p-4">
         <Toaster position="top-center" />
-        <div className="bg-white rounded-2xl shadow-2xl p-8 max-w-md w-full text-center">
-          <div className="text-6xl mb-4">🛒</div>
-          <h1 className="text-3xl font-bold text-gray-800 mb-2">Groceries</h1>
-          <p className="text-gray-600 mb-8">
-            This app is designed for mobile devices. Scan the QR code with your phone to get started.
-          </p>
-          
-          <div className="bg-white p-6 rounded-xl border-2 border-gray-200 mb-6 inline-block">
-            <QRCodeSVG value={currentUrl} size={200} level="H" />
+        <div className="bg-white rounded-2xl shadow-xl p-8 max-w-md w-full text-center">
+          <div className="flex items-center justify-center w-16 h-16 bg-blue-100 rounded-full mx-auto mb-6">
+            <ShoppingCart className="w-8 h-8 text-blue-600" />
           </div>
           
-          <p className="text-sm text-gray-500">
-            Open the camera app on your phone and point it at the QR code above.
+          <h1 className="text-3xl font-bold text-gray-900 mb-2">EasyGroceries</h1>
+          <p className="text-gray-600 mb-8">
+            Smart grocery inventory for your phone
           </p>
+          
+          <div className="bg-blue-50 border border-blue-200 rounded-lg p-6 mb-8">
+            <p className="text-sm text-gray-600 mb-3 font-medium">Visit on mobile:</p>
+            <code className="block text-blue-600 font-mono text-sm break-all">
+              easygroceries.vercel.app
+            </code>
+          </div>
+          
+          <div className="flex flex-col gap-3 text-sm text-gray-600">
+            <div className="flex items-start gap-3">
+              <div className="flex-shrink-0 w-5 h-5 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center text-xs font-semibold mt-0.5">1</div>
+              <span>Open the link on your phone</span>
+            </div>
+            <div className="flex items-start gap-3">
+              <div className="flex-shrink-0 w-5 h-5 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center text-xs font-semibold mt-0.5">2</div>
+              <span>Install as an app or use in browser</span>
+            </div>
+            <div className="flex items-start gap-3">
+              <div className="flex-shrink-0 w-5 h-5 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center text-xs font-semibold mt-0.5">3</div>
+              <span>Start tracking your groceries!</span>
+            </div>
+          </div>
         </div>
       </div>
     )
@@ -194,182 +211,276 @@ export default function LoginPage() {
   // Mobile - not installed - show install prompt
   if (!isInstalled) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-emerald-50 to-teal-100 p-4">
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex flex-col">
         <Toaster position="top-center" />
-        <div className="bg-white rounded-2xl shadow-2xl p-8 max-w-md w-full">
-          <div className="text-center mb-6">
-            <div className="text-6xl mb-4">🛒</div>
-            <h1 className="text-3xl font-bold text-gray-800 mb-2">Groceries</h1>
-            <p className="text-gray-600">
-              Smart grocery inventory management
-            </p>
-          </div>
-
-          <div className="space-y-4">
-            <div className="bg-emerald-50 border-l-4 border-emerald-400 p-4 rounded">
-              <div className="flex items-start">
-                <div className="flex-shrink-0">
-                  <svg className="h-5 w-5 text-emerald-400 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
-                    <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
-                  </svg>
-                </div>
-                <div className="ml-3">
-                  <p className="text-sm text-emerald-700">
-                    <span className="font-semibold">Install this app</span> for the best experience. It works offline and loads instantly.
-                  </p>
-                </div>
-              </div>
+        
+        {/* Top spacing */}
+        <div className="flex-1" />
+        
+        {/* Content */}
+        <div className="px-4 pb-8">
+          <div className="bg-white rounded-2xl shadow-xl p-8 max-w-md mx-auto">
+            {/* Icon */}
+            <div className="flex items-center justify-center w-16 h-16 bg-blue-100 rounded-full mx-auto mb-6">
+              <ShoppingCart className="w-8 h-8 text-blue-600" />
             </div>
+            
+            {/* Heading */}
+            <h1 className="text-3xl font-bold text-center text-gray-900 mb-2">
+              EasyGroceries
+            </h1>
+            <p className="text-center text-gray-600 mb-8">
+              Track inventory, predict needs
+            </p>
 
+            {/* Install card */}
             {showInstallPrompt && deferredPrompt ? (
-              <button
-                onClick={handleInstallClick}
-                className="w-full bg-emerald-500 hover:bg-emerald-600 text-white font-semibold py-3 px-6 rounded-lg shadow-md transition-all"
-              >
-                📲 Install App
-              </button>
+              <div className="space-y-4">
+                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                  <p className="text-sm text-gray-700 mb-2 font-medium">📱 Install this app</p>
+                  <p className="text-sm text-gray-600">Works like a native app with fast loading and offline browsing support.</p>
+                </div>
+                <button
+                  onClick={handleInstallClick}
+                  className="w-full bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white font-semibold py-3 px-6 rounded-lg shadow-sm transition-colors flex items-center justify-center gap-2"
+                >
+                  <Download className="w-5 h-5" />
+                  Install App
+                </button>
+                <button
+                  onClick={() => setIsInstalled(true)}
+                  className="w-full bg-gray-100 hover:bg-gray-200 active:bg-gray-300 text-gray-800 font-semibold py-2 px-6 rounded-lg transition-colors text-sm"
+                >
+                  Continue in browser
+                </button>
+              </div>
             ) : (
-              <div className="bg-gray-50 p-4 rounded-lg">
-                <p className="text-sm text-gray-600 mb-2 font-semibold">To install:</p>
-                <ol className="text-sm text-gray-600 space-y-1 list-decimal list-inside">
-                  <li>Tap the Share button <span className="inline-block">⎙</span></li>
-                  <li>Select &quot;Add to Home Screen&quot;</li>
-                  <li>Tap &quot;Add&quot;</li>
-                </ol>
+              <div className="space-y-4">
+                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                  <p className="text-sm font-semibold text-gray-900 mb-3">To install on home screen:</p>
+                  <ol className="text-sm text-gray-700 space-y-2">
+                    <li className="flex items-start gap-2">
+                      <span className="font-semibold flex-shrink-0">1.</span>
+                      <span>Tap the share button</span>
+                    </li>
+                    <li className="flex items-start gap-2">
+                      <span className="font-semibold flex-shrink-0">2.</span>
+                      <span>Choose &quot;Add to Home Screen&quot;</span>
+                    </li>
+                    <li className="flex items-start gap-2">
+                      <span className="font-semibold flex-shrink-0">3.</span>
+                      <span>Tap &quot;Add&quot; and start using!</span>
+                    </li>
+                  </ol>
+                </div>
+                <button
+                  onClick={() => setIsInstalled(true)}
+                  className="w-full bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white font-semibold py-3 px-6 rounded-lg shadow-sm transition-colors"
+                >
+                  Continue
+                </button>
               </div>
             )}
-
-            <button
-              onClick={() => setIsInstalled(true)}
-              className="w-full bg-gray-200 hover:bg-gray-300 text-gray-700 font-semibold py-2 px-6 rounded-lg transition-all text-sm"
-            >
-              Continue without installing
-            </button>
           </div>
         </div>
+        
+        {/* Bottom spacing */}
+        <div className="flex-1" />
       </div>
     )
   }
 
-  // Mobile - installed or skipped install - show OTP or magic link confirmation
+  // Mobile - OTP verification
   if (otpSent) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-emerald-50 to-teal-100 p-4">
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex flex-col">
         <Toaster position="top-center" />
-        <div className="bg-white rounded-2xl shadow-2xl p-8 max-w-md w-full">
-          <div className="text-center mb-6">
-            <div className="text-6xl mb-4">🔢</div>
-            <h2 className="text-2xl font-bold text-gray-800 mb-2">Enter verification code</h2>
-            <p className="text-gray-600">
-              We sent a 6-digit code to <span className="font-semibold">{sentToEmail}</span>
+        
+        {/* Top spacing */}
+        <div className="flex-1" />
+        
+        {/* Content */}
+        <div className="px-4 pb-8">
+          <div className="bg-white rounded-2xl shadow-xl p-8 max-w-md mx-auto">
+            {/* Icon */}
+            <div className="flex items-center justify-center w-16 h-16 bg-blue-100 rounded-full mx-auto mb-6">
+              <Mail className="w-8 h-8 text-blue-600" />
+            </div>
+
+            <h2 className="text-2xl font-bold text-center text-gray-900 mb-2">
+              Enter code
+            </h2>
+            <p className="text-center text-gray-600 mb-8">
+              Check your email at{' '}
+              <span className="font-semibold text-gray-900">{sentToEmail}</span>
             </p>
+
+            <div className="space-y-4">
+              <input
+                type="text"
+                value={otpCode}
+                onChange={(e) => setOtpCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                placeholder="000000"
+                className="w-full px-4 py-3 border border-gray-300 rounded-lg text-center text-3xl font-mono tracking-[0.5em] focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
+                maxLength={6}
+                autoFocus
+              />
+
+              <button
+                onClick={verifyOtpCode}
+                disabled={verifyingOtp || otpCode.length !== 6}
+                className="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed active:bg-blue-800 text-white font-semibold py-3 px-6 rounded-lg shadow-sm transition-colors flex items-center justify-center gap-2"
+              >
+                {verifyingOtp ? (
+                  <>
+                    <span className="inline-block animate-spin">⟳</span>
+                    Verifying...
+                  </>
+                ) : (
+                  <>
+                    Sign In
+                    <ArrowRight className="w-5 h-5" />
+                  </>
+                )}
+              </button>
+
+              <button
+                onClick={() => {
+                  setOtpSent(false)
+                  setSentToEmail('')
+                  setOtpCode('')
+                  setEmail('')
+                }}
+                className="w-full text-blue-600 hover:text-blue-700 font-medium text-sm py-2"
+              >
+                Try another email
+              </button>
+            </div>
           </div>
+        </div>
+        
+        {/* Bottom spacing */}
+        <div className="flex-1" />
+      </div>
+    )
+  }
 
-          <div className="space-y-4">
-            <input
-              type="text"
-              value={otpCode}
-              onChange={(e) => setOtpCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
-              placeholder="000000"
-              className="w-full px-4 py-3 border border-gray-300 rounded-lg text-center text-2xl font-mono tracking-widest focus:ring-2 focus:ring-emerald-500 focus:border-transparent outline-none"
-              maxLength={6}
-              autoFocus
-            />
+  // Mobile - magic link sent confirmation
+  if (magicLinkSent) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex flex-col">
+        <Toaster position="top-center" />
+        
+        {/* Top spacing */}
+        <div className="flex-1" />
+        
+        {/* Content */}
+        <div className="px-4 pb-8">
+          <div className="bg-white rounded-2xl shadow-xl p-8 max-w-md mx-auto text-center">
+            {/* Icon */}
+            <div className="flex items-center justify-center w-16 h-16 bg-blue-100 rounded-full mx-auto mb-6">
+              <Mail className="w-8 h-8 text-blue-600" />
+            </div>
 
-            <button
-              onClick={verifyOtpCode}
-              disabled={verifyingOtp || otpCode.length !== 6}
-              className="w-full bg-emerald-500 hover:bg-emerald-600 disabled:bg-gray-300 disabled:cursor-not-allowed text-white font-semibold py-3 px-6 rounded-lg shadow-md transition-all"
-            >
-              {verifyingOtp ? 'Verifying...' : 'Verify Code'}
-            </button>
+            <h2 className="text-2xl font-bold text-gray-900 mb-2">
+              Check your email
+            </h2>
+            <p className="text-gray-600 mb-8">
+              We sent a link to{' '}
+              <span className="font-semibold text-gray-900">{sentToEmail}</span>
+            </p>
+            
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-8 text-sm text-gray-700">
+              Click the link in your email to sign in. You can close this page.
+            </div>
 
             <button
               onClick={() => {
-                setOtpSent(false)
+                setMagicLinkSent(false)
                 setSentToEmail('')
-                setOtpCode('')
                 setEmail('')
               }}
-              className="w-full text-emerald-600 hover:text-emerald-700 font-semibold text-sm"
+              className="w-full text-blue-600 hover:text-blue-700 font-medium"
             >
-              ← Try a different email
+              Try another email
             </button>
           </div>
         </div>
+        
+        {/* Bottom spacing */}
+        <div className="flex-1" />
       </div>
     )
   }
 
-  if (magicLinkSent) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-emerald-50 to-teal-100 p-4">
-        <Toaster position="top-center" />
-        <div className="bg-white rounded-2xl shadow-2xl p-8 max-w-md w-full text-center">
-          <div className="text-6xl mb-4">📧</div>
-          <h2 className="text-2xl font-bold text-gray-800 mb-2">Check your email</h2>
-          <p className="text-gray-600 mb-6">
-            We sent a magic link to <span className="font-semibold">{sentToEmail}</span>
-          </p>
-          <p className="text-sm text-gray-500 mb-6">
-            Click the link in the email to sign in. You can close this page.
-          </p>
-          <button
-            onClick={() => {
-              setMagicLinkSent(false)
-              setSentToEmail('')
-              setEmail('')
-            }}
-            className="text-emerald-600 hover:text-emerald-700 font-semibold text-sm"
-          >
-            ← Try a different email
-          </button>
-        </div>
-      </div>
-    )
-  }
-
+  // Mobile - Login form
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-emerald-50 to-teal-100 p-4">
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex flex-col">
       <Toaster position="top-center" />
-      <div className="bg-white rounded-2xl shadow-2xl p-8 max-w-md w-full">
-        <div className="text-center mb-8">
-          <div className="text-6xl mb-4">🛒</div>
-          <h1 className="text-3xl font-bold text-gray-800 mb-2">Groceries</h1>
-          <p className="text-gray-600">
-            Track your inventory, never run out
+      
+      {/* Top spacing */}
+      <div className="flex-1" />
+      
+      {/* Content */}
+      <div className="px-4 pb-8">
+        <div className="bg-white rounded-2xl shadow-xl p-8 max-w-md mx-auto">
+          {/* Icon */}
+          <div className="flex items-center justify-center w-16 h-16 bg-blue-100 rounded-full mx-auto mb-6">
+            <ShoppingCart className="w-8 h-8 text-blue-600" />
+          </div>
+          
+          {/* Heading */}
+          <h1 className="text-3xl font-bold text-center text-gray-900 mb-2">
+            EasyGroceries
+          </h1>
+          <p className="text-center text-gray-600 mb-8">
+            Smart inventory tracking
+          </p>
+
+          {/* Form */}
+          <form onSubmit={handleLogin} className="space-y-4">
+            <div>
+              <label htmlFor="email" className="block text-sm font-semibold text-gray-900 mb-2">
+                Email address
+              </label>
+              <input
+                type="email"
+                id="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="you@example.com"
+                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all"
+                required
+              />
+            </div>
+
+            <button
+              type="submit"
+              disabled={loading}
+              className="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed active:bg-blue-800 text-white font-semibold py-3 px-6 rounded-lg shadow-sm transition-colors flex items-center justify-center gap-2"
+            >
+              {loading ? (
+                <>
+                  <span className="inline-block animate-spin">⟳</span>
+                  Sending...
+                </>
+              ) : (
+                <>
+                  Send Sign-In Link
+                  <ArrowRight className="w-5 h-5" />
+                </>
+              )}
+            </button>
+          </form>
+
+          <p className="text-xs text-gray-600 text-center mt-6 leading-relaxed">
+            We&apos;ll email you a code (PWA) or magic link (browser) for a password-free sign in.
           </p>
         </div>
-
-        <form onSubmit={handleLogin} className="space-y-4">
-          <div>
-            <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-2">
-              Email address
-            </label>
-            <input
-              type="email"
-              id="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              placeholder="you@example.com"
-              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-transparent outline-none transition-all"
-              required
-            />
-          </div>
-
-          <button
-            type="submit"
-            disabled={loading}
-            className="w-full bg-emerald-500 hover:bg-emerald-600 disabled:bg-gray-300 disabled:cursor-not-allowed text-white font-semibold py-3 px-6 rounded-lg shadow-md transition-all"
-          >
-            {loading ? 'Sending...' : 'Send Magic Link'}
-          </button>
-        </form>
-
-        <p className="text-xs text-gray-500 text-center mt-6">
-          We&apos;ll email you a magic link for a password-free sign in.
-        </p>
       </div>
+      
+      {/* Bottom spacing */}
+      <div className="flex-1" />
     </div>
   )
 }

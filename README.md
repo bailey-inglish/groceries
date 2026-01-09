@@ -1,10 +1,10 @@
-# Groceries 🛒
+# EasyGroceries
 
 A beautiful, mobile-first Progressive Web App for smart grocery inventory management. Track what you have, predict what you'll need, never run out.
 
 🌐 **Live App**: [easygroceries.vercel.app](https://easygroceries.vercel.app)
 
-![Version](https://img.shields.io/badge/version-2.0.0-emerald)
+![Version](https://img.shields.io/badge/version-2.0.0-blue)
 ![Next.js](https://img.shields.io/badge/Next.js-15-black)
 ![TypeScript](https://img.shields.io/badge/TypeScript-5-blue)
 ![License](https://img.shields.io/badge/license-MIT-green)
@@ -13,15 +13,16 @@ A beautiful, mobile-first Progressive Web App for smart grocery inventory manage
 
 ### 📱 Mobile-First PWA
 - **Install on any device** - Works as a standalone app on iOS and Android
-- **Offline support** - Access your inventory even without internet
-- **Desktop QR code** - Scan with your phone to quickly access on mobile
-- **Fast and responsive** - Optimized for mobile performance
+- **Fast and responsive** - Optimized for mobile performance with flat design
+- **Clean UI** - Simple, elegant interface with intuitive navigation
+- **Real-time sync** - Data syncs instantly across devices
 
 ### 📦 Inventory Management
 - **Barcode scanning** - Use your camera to scan items in and out
+- **Auto-lookup** - Automatically look up product names from barcodes (via Open Food Facts)
 - **Custom locations** - Organize items by Pantry, Fridge, Freezer, or custom locations
 - **Search and filter** - Quickly find items by name, barcode, or location
-- **Edit and delete** - Manage quantities, categories, and notes
+- **Edit and delete** - Manage quantities and categories
 
 ### 🧠 Smart Shopping List
 - **Adaptive predictions** - AI learns your usage patterns
@@ -33,7 +34,8 @@ A beautiful, mobile-first Progressive Web App for smart grocery inventory manage
 - **One-tap actions** - Add suggestions to list or mark as purchased
 
 ### 🔐 Secure Authentication
-- **Magic link login** - Passwordless email authentication
+- **Email OTP on PWA** - 6-digit code sent to email for app users
+- **Magic link on web** - Passwordless email authentication on desktop
 - **Private data** - Each user's data is isolated with Row Level Security
 - **Session management** - Automatic token refresh and secure sessions
 

@@ -6,6 +6,7 @@ import { supabase, scanInItem, getUserLocations, addUserLocation, lookupUPC } fr
 import { toast, Toaster } from 'sonner'
 import BarcodeScanner from '@/components/BarcodeScanner'
 import Link from 'next/link'
+import { ArrowLeft, Plus, X } from 'lucide-react'
 
 export default function ScanInPage() {
   const router = useRouter()
@@ -120,56 +121,87 @@ export default function ScanInPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-emerald-50 to-teal-100">
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100">
       <Toaster position="top-center" />
       
       {/* Header */}
-      <div className="bg-white shadow-sm">
-        <div className="max-w-md mx-auto px-4 py-4 flex items-center justify-between">
-          <Link href="/home" className="text-emerald-600 hover:text-emerald-700 font-medium">
-            ← Back
+      <div className="bg-white border-b border-gray-200">
+        <div className="max-w-2xl mx-auto px-4 py-4 flex items-center gap-4">
+          <Link href="/home" className="p-2 hover:bg-gray-100 rounded-lg transition-colors text-gray-600 hover:text-gray-900" title="Back to home">
+            <ArrowLeft className="w-6 h-6" />
           </Link>
-          <h1 className="text-xl font-bold text-gray-800">Scan In</h1>
-          <div className="w-16"></div> {/* Spacer for centering */}
+          <h1 className="text-xl font-bold text-gray-900 flex-1">Scan In</h1>
         </div>
       </div>
 
-      <div className="max-w-md mx-auto px-4 py-6 space-y-6">
-        {/* Scanner */}
+      <div className="max-w-2xl mx-auto px-4 py-6">
+        {/* Scanner Section */}
         {showScanner && (
-          <div className="bg-white rounded-2xl shadow-lg p-4">
-            <BarcodeScanner
-              onScan={handleBarcodeScanned}
-              onError={(error) => toast.error(error)}
-            />
+          <div>
+            <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4 mb-6">
+              <BarcodeScanner
+                onScan={handleBarcodeScanned}
+                onError={(error) => toast.error(error)}
+              />
+            </div>
+            
+            {/* Help Text */}
+            {!scannedBarcode && (
+              <div className="bg-blue-50 border border-blue-200 rounded-xl p-4">
+                <div className="flex gap-3">
+                  <div className="flex-shrink-0">
+                    <div className="flex items-center justify-center w-6 h-6 bg-blue-200 rounded-full">
+                      <span className="text-xs font-semibold text-blue-600">📷</span>
+                    </div>
+                  </div>
+                  <div>
+                    <p className="text-sm text-gray-900 font-semibold mb-1">Scan a barcode</p>
+                    <p className="text-sm text-gray-700">
+                      Point your camera at any product barcode to add it to inventory.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         )}
 
         {/* Form */}
         {scannedBarcode && (
-          <div className="bg-white rounded-2xl shadow-lg p-6">
-            <h2 className="text-lg font-bold text-gray-800 mb-4">Item Details</h2>
+          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 space-y-5">
+            <div className="flex items-center justify-between mb-2">
+              <h2 className="font-semibold text-gray-900">Item Details</h2>
+              <button
+                onClick={() => {
+                  setScannedBarcode('')
+                  setShowScanner(true)
+                  setItemName('')
+                  setCategory('')
+                }}
+                className="p-1 hover:bg-gray-100 rounded-lg text-gray-600 hover:text-gray-900"
+                title="Close form"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
             
-            <form onSubmit={handleSubmit} className="space-y-4">
+            <form onSubmit={handleSubmit} className="space-y-5">
               {/* Barcode Display */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label className="block text-sm font-semibold text-gray-900 mb-2">
                   Barcode
                 </label>
                 <div className="flex items-center gap-2">
-                  <input
-                    type="text"
-                    value={scannedBarcode}
-                    readOnly
-                    className="flex-1 px-3 py-2 border border-gray-300 rounded-lg bg-gray-50 text-gray-600"
-                  />
+                  <code className="flex-1 px-3 py-2 bg-gray-100 border border-gray-300 rounded-lg text-gray-600 text-sm font-mono">
+                    {scannedBarcode}
+                  </code>
                   <button
                     type="button"
                     onClick={() => {
                       setScannedBarcode('')
                       setShowScanner(true)
                     }}
-                    className="px-3 py-2 bg-gray-200 hover:bg-gray-300 rounded-lg text-sm font-medium"
+                    className="px-3 py-2 bg-gray-100 hover:bg-gray-200 rounded-lg text-sm font-medium text-gray-900 transition-colors"
                   >
                     Rescan
                   </button>
@@ -178,8 +210,8 @@ export default function ScanInPage() {
 
               {/* Item Name */}
               <div>
-                <label htmlFor="itemName" className="block text-sm font-medium text-gray-700 mb-1">
-                  Item Name *
+                <label htmlFor="itemName" className="block text-sm font-semibold text-gray-900 mb-2">
+                  Item Name <span className="text-red-500">*</span>
                 </label>
                 <input
                   type="text"
@@ -187,7 +219,7 @@ export default function ScanInPage() {
                   value={itemName}
                   onChange={(e) => setItemName(e.target.value)}
                   placeholder="e.g., Cheez-Its"
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-transparent outline-none"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all"
                   required
                   autoFocus
                 />
@@ -195,7 +227,7 @@ export default function ScanInPage() {
 
               {/* Category */}
               <div>
-                <label htmlFor="category" className="block text-sm font-medium text-gray-700 mb-1">
+                <label htmlFor="category" className="block text-sm font-semibold text-gray-900 mb-2">
                   Category
                 </label>
                 <input
@@ -204,13 +236,13 @@ export default function ScanInPage() {
                   value={category}
                   onChange={(e) => setCategory(e.target.value)}
                   placeholder="e.g., Snacks"
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-transparent outline-none"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all"
                 />
               </div>
 
               {/* Location */}
               <div>
-                <label htmlFor="location" className="block text-sm font-medium text-gray-700 mb-1">
+                <label htmlFor="location" className="block text-sm font-semibold text-gray-900 mb-2">
                   Location
                 </label>
                 {!showLocationInput ? (
@@ -219,7 +251,7 @@ export default function ScanInPage() {
                       id="location"
                       value={location}
                       onChange={(e) => setLocation(e.target.value)}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-transparent outline-none"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all"
                     >
                       <option value="">Select location...</option>
                       {locations.map((loc) => (
@@ -229,7 +261,7 @@ export default function ScanInPage() {
                     <button
                       type="button"
                       onClick={() => setShowLocationInput(true)}
-                      className="text-sm text-emerald-600 hover:text-emerald-700 font-medium"
+                      className="text-sm text-blue-600 hover:text-blue-700 font-medium"
                     >
                       + Add new location
                     </button>
@@ -241,13 +273,13 @@ export default function ScanInPage() {
                       value={newLocation}
                       onChange={(e) => setNewLocation(e.target.value)}
                       placeholder="e.g., Pantry, Fridge"
-                      className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-transparent outline-none"
+                      className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all"
                       autoFocus
                     />
                     <button
                       type="button"
                       onClick={handleAddLocation}
-                      className="px-3 py-2 bg-emerald-500 hover:bg-emerald-600 text-white rounded-lg font-medium"
+                      className="px-3 py-2 bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white rounded-lg font-medium transition-colors"
                     >
                       Add
                     </button>
@@ -257,7 +289,7 @@ export default function ScanInPage() {
                         setShowLocationInput(false)
                         setNewLocation('')
                       }}
-                      className="px-3 py-2 bg-gray-200 hover:bg-gray-300 rounded-lg font-medium"
+                      className="px-3 py-2 bg-gray-100 hover:bg-gray-200 rounded-lg font-medium text-gray-900 transition-colors"
                     >
                       Cancel
                     </button>
@@ -267,7 +299,7 @@ export default function ScanInPage() {
 
               {/* Quantity */}
               <div>
-                <label htmlFor="quantity" className="block text-sm font-medium text-gray-700 mb-1">
+                <label htmlFor="quantity" className="block text-sm font-semibold text-gray-900 mb-2">
                   Quantity
                 </label>
                 <input
@@ -276,7 +308,7 @@ export default function ScanInPage() {
                   value={quantity}
                   onChange={(e) => setQuantity(Math.max(1, parseInt(e.target.value) || 1))}
                   min="1"
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-transparent outline-none"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all"
                 />
               </div>
 
@@ -284,20 +316,21 @@ export default function ScanInPage() {
               <button
                 type="submit"
                 disabled={loading}
-                className="w-full bg-emerald-500 hover:bg-emerald-600 disabled:bg-gray-300 disabled:cursor-not-allowed text-white font-semibold py-3 px-6 rounded-lg shadow-md transition-all"
+                className="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed active:bg-blue-800 text-white font-semibold py-3 px-6 rounded-lg shadow-sm transition-colors flex items-center justify-center gap-2"
               >
-                {loading ? 'Adding...' : '✓ Add to Inventory'}
+                {loading ? (
+                  <>
+                    <span className="inline-block animate-spin">⟳</span>
+                    Adding...
+                  </>
+                ) : (
+                  <>
+                    <Plus className="w-5 h-5" />
+                    Add to Inventory
+                  </>
+                )}
               </button>
             </form>
-          </div>
-        )}
-
-        {/* Help Text */}
-        {showScanner && !scannedBarcode && (
-          <div className="bg-emerald-50 border-l-4 border-emerald-400 p-4 rounded">
-            <p className="text-sm text-emerald-700">
-              <span className="font-semibold">📷 Scan a barcode</span> to quickly add items to your inventory. Point your camera at the barcode and hold steady.
-            </p>
           </div>
         )}
       </div>

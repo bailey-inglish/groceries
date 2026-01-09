@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { supabase, getInventoryItems, updateInventoryItem, deleteInventoryItem, getUserLocations, type InventoryItem } from '@/lib/supabase'
 import { toast, Toaster } from 'sonner'
 import Link from 'next/link'
+import { ArrowLeft, Search, Trash2, Edit2, Package } from 'lucide-react'
 
 export default function InventoryPage() {
   const router = useRouter()
@@ -109,54 +110,69 @@ export default function InventoryPage() {
     )
   }
 
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100">
+        <div className="text-center">
+          <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500"></div>
+          <p className="mt-4 text-gray-600 font-medium">Loading...</p>
+        </div>
+      </div>
+    )
+  }
+
   return (
-    <div className="min-h-screen bg-gradient-to-br from-emerald-50 to-teal-100 pb-20">
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 pb-20">
       <Toaster position="top-center" />
       
       {/* Header */}
-      <div className="bg-white shadow-sm sticky top-0 z-10">
-        <div className="max-w-md mx-auto px-4 py-4">
-          <div className="flex items-center justify-between mb-4">
-            <Link href="/home" className="text-emerald-600 hover:text-emerald-700 font-medium">
-              ← Back
+      <div className="bg-white border-b border-gray-200 sticky top-0 z-10">
+        <div className="max-w-2xl mx-auto px-4 py-4">
+          <div className="flex items-center gap-4 mb-4">
+            <Link href="/home" className="p-2 hover:bg-gray-100 rounded-lg transition-colors text-gray-600 hover:text-gray-900" title="Back to home">
+              <ArrowLeft className="w-6 h-6" />
             </Link>
-            <h1 className="text-xl font-bold text-gray-800">Inventory</h1>
-            <div className="w-16"></div>
+            <h1 className="text-xl font-bold text-gray-900 flex-1">Inventory</h1>
           </div>
 
           {/* Search */}
-          <input
-            type="text"
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            placeholder="Search items..."
-            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-transparent outline-none mb-2"
-          />
+          <div className="space-y-2">
+            <div className="relative">
+              <Search className="w-5 h-5 absolute left-3 top-2.5 text-gray-400" />
+              <input
+                type="text"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                placeholder="Search items..."
+                className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all"
+              />
+            </div>
 
-          {/* Location Filter */}
-          {locations.length > 0 && (
-            <select
-              value={locationFilter}
-              onChange={(e) => setLocationFilter(e.target.value)}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-transparent outline-none"
-            >
-              <option value="">All locations</option>
-              {locations.map((loc) => (
-                <option key={loc} value={loc}>{loc}</option>
-              ))}
-            </select>
-          )}
+            {/* Location Filter */}
+            {locations.length > 0 && (
+              <select
+                value={locationFilter}
+                onChange={(e) => setLocationFilter(e.target.value)}
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all text-sm"
+              >
+                <option value="">All locations</option>
+                {locations.map((loc) => (
+                  <option key={loc} value={loc}>{loc}</option>
+                ))}
+              </select>
+            )}
+          </div>
         </div>
       </div>
 
-      <div className="max-w-md mx-auto px-4 py-6">
-        {/* Stats */}
-        <div className="bg-white rounded-2xl shadow-lg p-4 mb-4">
+      <div className="max-w-2xl mx-auto px-4 py-6">
+        {/* Count Card */}
+        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4 mb-6">
           <div className="flex items-center justify-between">
             <div>
-              <div className="text-2xl font-bold text-gray-800">{filteredItems.length}</div>
-              <div className="text-sm text-gray-600">
-                {searchTerm || locationFilter ? 'Filtered items' : 'Total items'}
+              <div className="text-3xl font-bold text-blue-600">{filteredItems.length}</div>
+              <div className="text-sm text-gray-600 mt-1">
+                {searchTerm || locationFilter ? 'Filtered items' : 'items'}
               </div>
             </div>
             {(searchTerm || locationFilter) && (
@@ -165,9 +181,9 @@ export default function InventoryPage() {
                   setSearchTerm('')
                   setLocationFilter('')
                 }}
-                className="text-sm text-emerald-600 hover:text-emerald-700 font-medium"
+                className="text-sm text-blue-600 hover:text-blue-700 font-medium px-3 py-1 hover:bg-blue-50 rounded-lg"
               >
-                Clear filters
+                Clear
               </button>
             )}
           </div>
@@ -175,30 +191,32 @@ export default function InventoryPage() {
 
         {/* Items List */}
         {filteredItems.length === 0 ? (
-          <div className="bg-white rounded-2xl shadow-lg p-8 text-center">
-            <div className="text-5xl mb-4">📦</div>
-            <h2 className="text-lg font-bold text-gray-800 mb-2">
+          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-8 text-center space-y-4">
+            <div className="inline-flex items-center justify-center w-12 h-12 bg-blue-100 rounded-full">
+              <Package className="w-6 h-6 text-blue-600" />
+            </div>
+            <h2 className="text-lg font-semibold text-gray-900">
               {searchTerm || locationFilter ? 'No items found' : 'No items yet'}
             </h2>
-            <p className="text-gray-600 mb-6">
+            <p className="text-gray-600 text-sm">
               {searchTerm || locationFilter 
-                ? 'Try adjusting your filters' 
-                : 'Start by scanning in your first item!'
+                ? 'Try adjusting your search' 
+                : 'Scan in your first item to get started'
               }
             </p>
             {!searchTerm && !locationFilter && (
               <Link
                 href="/scan-in"
-                className="inline-block bg-emerald-500 hover:bg-emerald-600 text-white font-semibold py-2 px-6 rounded-lg"
+                className="inline-block bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white font-semibold py-2.5 px-6 rounded-lg transition-colors"
               >
-                Scan In Item
+                Scan Item
               </Link>
             )}
           </div>
         ) : (
           <div className="space-y-3">
             {filteredItems.map((item) => (
-              <div key={item.id} className="bg-white rounded-xl shadow-lg p-4">
+              <div key={item.id} className="bg-white rounded-xl shadow-sm border border-gray-200 p-4">
                 {editingItem?.id === item.id ? (
                   // Edit Mode
                   <div className="space-y-3">
@@ -206,8 +224,9 @@ export default function InventoryPage() {
                       type="text"
                       value={editingItem.name}
                       onChange={(e) => setEditingItem({ ...editingItem, name: e.target.value })}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg font-bold"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg font-semibold"
                       placeholder="Item name"
+                      autoFocus
                     />
                     <input
                       type="text"
@@ -233,23 +252,16 @@ export default function InventoryPage() {
                       className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
                       min="1"
                     />
-                    <textarea
-                      value={editingItem.notes || ''}
-                      onChange={(e) => setEditingItem({ ...editingItem, notes: e.target.value })}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
-                      placeholder="Notes (optional)"
-                      rows={2}
-                    />
-                    <div className="flex gap-2">
+                    <div className="flex gap-2 pt-2">
                       <button
                         onClick={() => setEditingItem(null)}
-                        className="flex-1 bg-gray-200 hover:bg-gray-300 text-gray-700 font-medium py-2 px-4 rounded-lg"
+                        className="flex-1 bg-gray-100 hover:bg-gray-200 active:bg-gray-300 text-gray-900 font-medium py-2 px-4 rounded-lg text-sm transition-colors"
                       >
                         Cancel
                       </button>
                       <button
                         onClick={handleSave}
-                        className="flex-1 bg-emerald-500 hover:bg-emerald-600 text-white font-medium py-2 px-4 rounded-lg"
+                        className="flex-1 bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white font-medium py-2 px-4 rounded-lg text-sm transition-colors"
                       >
                         Save
                       </button>
@@ -257,49 +269,44 @@ export default function InventoryPage() {
                   </div>
                 ) : (
                   // View Mode
-                  <div>
-                    <div className="flex items-start justify-between mb-2">
+                  <div className="space-y-3">
+                    <div className="flex items-start justify-between">
                       <div className="flex-1">
-                        <h3 className="text-lg font-bold text-gray-800">{item.name}</h3>
-                        <div className="flex flex-wrap gap-2 mt-1">
-                          {item.category && (
-                            <span className="px-2 py-1 bg-blue-100 text-blue-700 text-xs font-medium rounded">
-                              {item.category}
-                            </span>
-                          )}
-                          {item.location && (
-                            <span className="px-2 py-1 bg-purple-100 text-purple-700 text-xs font-medium rounded">
-                              📍 {item.location}
-                            </span>
-                          )}
-                        </div>
+                        <h3 className="text-lg font-semibold text-gray-900">{item.name}</h3>
+                        {item.category && (
+                          <div className="text-sm text-gray-600 mt-1">{item.category}</div>
+                        )}
                       </div>
                       <div className="text-right">
-                        <div className="text-2xl font-bold text-emerald-600">{item.quantity}</div>
-                        <div className="text-xs text-gray-500">{item.unit}</div>
+                        <div className="text-2xl font-bold text-blue-600">{item.quantity}</div>
                       </div>
                     </div>
 
-                    <div className="text-xs text-gray-500 mb-3">
+                    {item.location && (
+                      <div className="inline-block px-2.5 py-1 bg-purple-100 text-purple-700 text-xs font-medium rounded">
+                        📍 {item.location}
+                      </div>
+                    )}
+
+                    <div className="text-xs text-gray-500 pt-1">
                       <div className="font-mono">{item.upc}</div>
                       <div>Added {new Date(item.scan_in_date).toLocaleDateString()}</div>
-                      {item.notes && (
-                        <div className="mt-1 text-gray-600 italic">&quot;{item.notes}&quot;</div>
-                      )}
                     </div>
 
-                    <div className="flex gap-2">
+                    <div className="flex gap-2 pt-2">
                       <button
                         onClick={() => handleEdit(item)}
-                        className="flex-1 bg-gray-100 hover:bg-gray-200 text-gray-700 font-medium py-2 px-4 rounded-lg text-sm"
+                        className="flex-1 bg-gray-100 hover:bg-gray-200 active:bg-gray-300 text-gray-900 font-medium py-2 px-4 rounded-lg text-sm transition-colors flex items-center justify-center gap-2"
                       >
-                        ✏️ Edit
+                        <Edit2 className="w-4 h-4" />
+                        Edit
                       </button>
                       <button
                         onClick={() => handleDelete(item.id, item.name)}
-                        className="flex-1 bg-red-100 hover:bg-red-200 text-red-700 font-medium py-2 px-4 rounded-lg text-sm"
+                        className="flex-1 bg-red-100 hover:bg-red-200 active:bg-red-300 text-red-700 font-medium py-2 px-4 rounded-lg text-sm transition-colors flex items-center justify-center gap-2"
                       >
-                        🗑️ Delete
+                        <Trash2 className="w-4 h-4" />
+                        Delete
                       </button>
                     </div>
                   </div>
