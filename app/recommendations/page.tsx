@@ -21,6 +21,8 @@ export default function RecommendationsPage() {
   const [loading, setLoading] = useState(true)
   const [calculating, setCalculating] = useState(false)
   const [confirmingItems, setConfirmingItems] = useState<Set<string>>(new Set())
+  const [purchaseDialog, setPurchaseDialog] = useState<{itemId: string, itemName: string, unit: string} | null>(null)
+  const [purchaseQuantity, setPurchaseQuantity] = useState(1)
 
   useEffect(() => {
     loadRecommendations()
@@ -88,45 +90,41 @@ export default function RecommendationsPage() {
   }
 
   async function handleConfirmPurchase(itemId: string) {
-    setConfirmingItems(new Set(confirmingItems).add(itemId))
-    
     const item = recommendations.find(r => r.id === itemId)
     if (!item) return
     
-    // Ask for quantity purchased
-    const quantityStr = prompt(`How many ${item.unit} of ${item.name} did you purchase?`, '1')
-    if (!quantityStr) {
-      setConfirmingItems(prev => {
-        const next = new Set(prev)
-        next.delete(itemId)
-        return next
-      })
-      return
-    }
+    // Show dialog to ask for quantity
+    setPurchaseDialog({ itemId, itemName: item.name, unit: item.unit })
+    setPurchaseQuantity(1)
+  }
+
+  async function completePurchase() {
+    if (!purchaseDialog) return
     
-    const quantity = parseInt(quantityStr)
-    if (isNaN(quantity) || quantity <= 0) {
-      alert('Invalid quantity')
-      setConfirmingItems(prev => {
-        const next = new Set(prev)
-        next.delete(itemId)
-        return next
-      })
-      return
-    }
+    setConfirmingItems(new Set(confirmingItems).add(purchaseDialog.itemId))
+    
+    const item = recommendations.find(r => r.id === purchaseDialog.itemId)
+    if (!item) return
     
     // Update inventory
-    await updateInventoryItem(itemId, {
-      quantity: item.quantity + quantity
+    await updateInventoryItem(purchaseDialog.itemId, {
+      quantity: item.quantity + purchaseQuantity
     })
     
     setConfirmingItems(prev => {
       const next = new Set(prev)
-      next.delete(itemId)
+      next.delete(purchaseDialog.itemId)
       return next
     })
     
+    setPurchaseDialog(null)
+    setPurchaseQuantity(1)
     await loadRecommendations()
+  }
+
+  function cancelPurchase() {
+    setPurchaseDialog(null)
+    setPurchaseQuantity(1)
   }
 
   const getPriorityBadge = (priority: 'high' | 'medium' | 'low') => {
@@ -308,6 +306,47 @@ export default function RecommendationsPage() {
             </div>
           </div>
         </div>
+
+        {/* Purchase Confirmation Dialog */}
+        {purchaseDialog && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+            <div className="bg-white rounded-lg shadow-xl max-w-md w-full p-6">
+              <h3 className="text-xl font-semibold mb-4 text-gray-800">
+                Confirm Purchase
+              </h3>
+              <p className="text-gray-600 mb-4">
+                How many {purchaseDialog.unit} of {purchaseDialog.itemName} did you purchase?
+              </p>
+              <div className="mb-6">
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Quantity
+                </label>
+                <input
+                  type="number"
+                  min="1"
+                  value={purchaseQuantity}
+                  onChange={(e) => setPurchaseQuantity(parseInt(e.target.value) || 1)}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  autoFocus
+                />
+              </div>
+              <div className="flex gap-3">
+                <button
+                  onClick={cancelPurchase}
+                  className="flex-1 bg-gray-200 hover:bg-gray-300 text-gray-800 font-semibold py-2 px-6 rounded-lg transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={completePurchase}
+                  className="flex-1 bg-green-500 hover:bg-green-600 text-white font-semibold py-2 px-6 rounded-lg transition-colors"
+                >
+                  Confirm
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </main>
   )
