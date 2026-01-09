@@ -1,133 +1,235 @@
-# Groceries Inventory Manager 🛒
+# Groceries 🛒
 
-A Progressive Web App (PWA) built with Next.js and Supabase for managing grocery and home item inventory with intelligent, adaptive learning for restocking recommendations.
+A beautiful, mobile-first Progressive Web App for smart grocery inventory management. Track what you have, predict what you'll need, never run out.
 
-## Features
+![Version](https://img.shields.io/badge/version-2.0.0-emerald)
+![Next.js](https://img.shields.io/badge/Next.js-15-black)
+![TypeScript](https://img.shields.io/badge/TypeScript-5-blue)
+![License](https://img.shields.io/badge/license-MIT-green)
 
-- **📷 Barcode Scanning**: Scan UPC barcodes to quickly add or remove items from your inventory
-- **📦 Inventory Management**: Track quantities, categories, and stock levels of all your items
-- **🧠 Adaptive Learning**: AI-powered algorithm that learns your consumption patterns
-- **🛍️ Smart Shopping Lists**: Get personalized recommendations on what to buy and when
-- **📱 PWA Support**: Install on your device and use offline
-- **🔄 Real-time Updates**: Instant synchronization with Supabase backend
+## ✨ Features
 
-## Technology Stack
+### 📱 Mobile-First PWA
+- **Install on any device** - Works as a standalone app on iOS and Android
+- **Offline support** - Access your inventory even without internet
+- **Desktop QR code** - Scan with your phone to quickly access on mobile
+- **Fast and responsive** - Optimized for mobile performance
 
-- **Frontend**: Next.js 14 (App Router), React 18, TypeScript
-- **Styling**: Tailwind CSS
-- **Backend**: Supabase (PostgreSQL)
-- **Barcode Scanning**: @zxing/library
-- **Camera Access**: react-webcam
+### 📦 Inventory Management
+- **Barcode scanning** - Use your camera to scan items in and out
+- **Custom locations** - Organize items by Pantry, Fridge, Freezer, or custom locations
+- **Search and filter** - Quickly find items by name, barcode, or location
+- **Edit and delete** - Manage quantities, categories, and notes
 
-## Getting Started
+### 🧠 Smart Shopping List
+- **Adaptive predictions** - AI learns your usage patterns
+- **Suggested items** - Get recommendations based on:
+  - Average days between purchases
+  - Last scan out date
+  - Confidence scores
+- **Definite items** - Manually add items or mark when scanning out
+- **One-tap actions** - Add suggestions to list or mark as purchased
+
+### 🔐 Secure Authentication
+- **Magic link login** - Passwordless email authentication
+- **Private data** - Each user's data is isolated with Row Level Security
+- **Session management** - Automatic token refresh and secure sessions
+
+## 🚀 Quick Start
 
 ### Prerequisites
-
-- Node.js 18+ 
-- A Supabase account (free tier works great)
+- Node.js 18+
+- A Supabase account (free tier works)
 
 ### Installation
 
-1. Clone the repository:
-```bash
-git clone https://github.com/bailey-inglish/groceries.git
-cd groceries
+1. **Clone the repository**
+   ```bash
+   git clone https://github.com/yourusername/groceries.git
+   cd groceries
+   ```
+
+2. **Install dependencies**
+   ```bash
+   npm install
+   ```
+
+3. **Set up Supabase**
+   
+   Create a new project at [supabase.com](https://supabase.com), then:
+   
+   - Go to SQL Editor
+   - Copy and run the contents of `database-schema.sql`
+   - Enable Email auth in Authentication → Providers
+
+4. **Configure environment variables**
+   
+   Create `.env.local` in the project root:
+   ```env
+   NEXT_PUBLIC_SUPABASE_URL=your_supabase_project_url
+   NEXT_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key
+   ```
+   
+   Get these from: Supabase Dashboard → Project Settings → API
+
+5. **Run the development server**
+   ```bash
+   npm run dev
+   ```
+   
+   Open [http://localhost:3000](http://localhost:3000) in your browser.
+
+## 📖 Usage
+
+### The Ideal Workflow
+
+1. **🛒 Go shopping**
+   - Buy your groceries as usual
+
+2. **📥 Scan items in**
+   - Open the app
+   - Tap "Scan In"
+   - Scan each item's barcode
+   - Enter name and select a location
+   - Done in seconds per item!
+
+3. **🍕 Use your groceries**
+   - Cook, eat, enjoy your food throughout the week
+
+4. **📤 Scan out when empty**
+   - Finished the Cheez-Its? Scan the empty box
+   - Choose to add it to your shopping list
+   - The app tracks your usage
+
+5. **🛍️ Review shopping list**
+   - At the end of the week, check your shopping list
+   - See definite items (what you marked)
+   - See suggestions (what the app predicts you'll need)
+   - Add predictions to your list with one tap
+   - Go shopping with your smart list!
+
+### How Predictions Work
+
+The app analyzes your scan history:
+- Groups items by barcode (UPC)
+- Calculates average days between purchases
+- Tracks when you last ran out
+- Predicts when you'll need to restock (70% threshold)
+- Confidence increases with more data points
+
+After 2-3 purchase cycles, you'll start seeing accurate predictions!
+
+## 🏗️ Tech Stack
+
+- **[Next.js 15](https://nextjs.org/)** - React framework with App Router
+- **[TypeScript](https://www.typescriptlang.org/)** - Type safety
+- **[Tailwind CSS](https://tailwindcss.com/)** - Styling
+- **[Supabase](https://supabase.com/)** - Backend (Auth, Database, RLS)
+- **[@zxing/library](https://github.com/zxing-js/library)** - Barcode scanning
+- **[qrcode.react](https://github.com/zpao/qrcode.react)** - QR code generation
+- **[sonner](https://sonner.emilkowal.ski/)** - Toast notifications
+
+## 📁 Project Structure
+
+```
+groceries/
+├── app/
+│   ├── page.tsx                 # Login page (PWA install, QR code)
+│   ├── layout.tsx               # Root layout
+│   ├── auth-callback/           # Magic link callback
+│   ├── home/                    # Dashboard with 4 main buttons
+│   ├── scan-in/                 # Scan in flow
+│   ├── scan-out/                # Scan out flow
+│   ├── inventory/               # Inventory management
+│   └── shopping-list/           # Shopping list with predictions
+├── components/
+│   └── BarcodeScanner.tsx       # Camera barcode scanner component
+├── lib/
+│   └── supabase.ts              # Supabase client & database helpers
+├── public/
+│   └── manifest.json            # PWA manifest
+├── database-schema.sql          # Complete database schema
+├── DATABASE.md                  # Setup and documentation
+└── README.md                    # This file
 ```
 
-2. Install dependencies:
-```bash
-npm install
-```
+## 🔒 Security
 
-3. Set up Supabase:
-   - Create a new project at [supabase.com](https://supabase.com)
-   - Run the SQL commands from `DATABASE.md` in your Supabase SQL editor
-   - Copy your project URL and anon key
+- **Row Level Security (RLS)** - All tables have RLS policies
+- **Authenticated access only** - Users can only see their own data
+- **Supabase Auth** - Secure session management
+- **No exposed secrets** - Service role key never in client code
+- **HTTPS required** - Camera access requires secure context
 
-4. Create a `.env.local` file in the root directory:
-```env
-NEXT_PUBLIC_SUPABASE_URL=your_supabase_project_url
-NEXT_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key
-```
+## 🚀 Deployment
 
-5. Run the development server:
-```bash
-npm run dev
-```
+### Vercel (Recommended)
 
-6. Open [http://localhost:3000](http://localhost:3000) in your browser
+1. Push your code to GitHub
+2. Import project in [Vercel](https://vercel.com)
+3. Add environment variables:
+   ```
+   NEXT_PUBLIC_SUPABASE_URL
+   NEXT_PUBLIC_SUPABASE_ANON_KEY
+   ```
+4. Deploy!
 
-### Building for Production
+### Post-Deployment
 
-```bash
-npm run build
-npm start
-```
+1. Update Supabase redirect URLs:
+   - Dashboard → Authentication → URL Configuration
+   - Add your production URL to Site URL and Redirect URLs
 
-## Usage
+2. Test the app:
+   - Magic link login
+   - Barcode scanning (requires HTTPS)
+   - PWA installation
 
-### Scanning Items
+## 🐛 Troubleshooting
 
-1. Navigate to the "Scan Item" page
-2. Grant camera permissions when prompted
-3. Point your camera at a product's UPC barcode
-4. For new items, fill in the details (name, category, unit, etc.)
-5. Choose to add or remove quantity from inventory
+### Camera not working
+- Ensure you're using HTTPS (required for camera access)
+- Check browser permissions
+- Test on a real mobile device (not simulator)
 
-### Managing Inventory
+### Magic link not arriving
+- Check spam folder
+- Verify email provider is enabled in Supabase
+- Check Supabase logs for email errors
 
-1. View all items in the "Inventory" page
-2. Search by name or UPC
-3. Filter by category
-4. Edit item details inline
-5. See stock levels and low stock alerts
+### No predictions showing
+- Need at least 2 complete scan cycles per item
+- Click the refresh button in shopping list
+- Check that `inventory_history` has data
 
-### Shopping Recommendations
+See [DATABASE.md](DATABASE.md) for more troubleshooting help.
 
-1. Visit the "Shopping List" page
-2. Click "Update Predictions" to run the adaptive learning algorithm
-3. View prioritized items that need restocking:
-   - **Urgent**: Out of stock or critically low
-   - **Soon**: Predicted to run out within a week
-   - **Monitor**: Items to keep an eye on
-4. Mark items as purchased to update inventory
-5. The algorithm learns from your patterns over time
+## 🛣️ Roadmap
 
-## How the Adaptive Learning Works
+- [ ] Push notifications for predicted restocks
+- [ ] Barcode database integration (auto-fill item names)
+- [ ] Receipt scanning with OCR
+- [ ] Household sharing (multiple users, shared inventory)
+- [ ] Expiration date tracking
+- [ ] Price tracking and budget management
+- [ ] Recipe integration
+- [ ] Export data as CSV
 
-The system tracks every inventory change and uses this data to:
+## 📄 License
 
-1. **Calculate Consumption Rate**: Analyzes how quickly you use each item
-2. **Predict Restocking**: Estimates when you'll run out based on current stock and usage rate
-3. **Build Confidence**: Improves accuracy as more data is collected
-4. **Prioritize Recommendations**: Suggests what to buy based on urgency and patterns
+MIT License - see [LICENSE](LICENSE) file for details
 
-The more you use the app, the smarter it gets!
-
-## Database Schema
-
-See `DATABASE.md` for detailed information about the database structure.
-
-## PWA Installation
-
-On mobile devices:
-- **iOS**: Tap the share button and select "Add to Home Screen"
-- **Android**: Tap the menu button and select "Install App" or "Add to Home Screen"
-
-On desktop browsers:
-- Look for the install icon in the address bar
-- Or use the browser menu to install the PWA
-
-## Contributing
+## 🤝 Contributing
 
 Contributions are welcome! Please feel free to submit a Pull Request.
 
-## License
+## 💬 Support
 
-This project is licensed under the MIT License - see the LICENSE file for details.
+For issues or questions:
+- Open an issue on GitHub
+- Check [DATABASE.md](DATABASE.md) for setup help
+- Review [Supabase docs](https://supabase.com/docs)
 
-## Acknowledgments
+---
 
-- Built with [Next.js](https://nextjs.org/)
-- Database powered by [Supabase](https://supabase.com/)
-- Barcode scanning via [ZXing](https://github.com/zxing-js/library)
+Made with ❤️ by [Your Name]

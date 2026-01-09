@@ -1,20 +1,34 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import { useRouter } from 'next/navigation'
+import { supabase, getInventoryItems, updateInventoryItem, deleteInventoryItem, getUserLocations, type InventoryItem } from '@/lib/supabase'
+import { toast, Toaster } from 'sonner'
 import Link from 'next/link'
-import { getInventoryItems, updateInventoryItem, type InventoryItem } from '@/lib/supabase'
 
 export default function InventoryPage() {
+  const router = useRouter()
   const [items, setItems] = useState<InventoryItem[]>([])
   const [filteredItems, setFilteredItems] = useState<InventoryItem[]>([])
   const [loading, setLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState('')
-  const [categoryFilter, setCategoryFilter] = useState('')
+  const [locationFilter, setLocationFilter] = useState('')
   const [editingItem, setEditingItem] = useState<InventoryItem | null>(null)
+  const [locations, setLocations] = useState<string[]>([])
 
   useEffect(() => {
-    loadItems()
-  }, [])
+    const checkAuth = async () => {
+      const { data } = await supabase.auth.getSession()
+      if (!data.session?.user) {
+        router.replace('/')
+        return
+      }
+      
+      await loadData()
+    }
+
+    checkAuth()
+  }, [router])
 
   useEffect(() => {
     let filtered = items
@@ -22,25 +36,30 @@ export default function InventoryPage() {
     if (searchTerm) {
       filtered = filtered.filter(item => 
         item.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        item.upc.includes(searchTerm)
+        item.upc.includes(searchTerm) ||
+        item.category?.toLowerCase().includes(searchTerm.toLowerCase())
       )
     }
 
-    if (categoryFilter) {
-      filtered = filtered.filter(item => item.category === categoryFilter)
+    if (locationFilter) {
+      filtered = filtered.filter(item => item.location === locationFilter)
     }
 
     setFilteredItems(filtered)
-  }, [items, searchTerm, categoryFilter])
+  }, [items, searchTerm, locationFilter])
 
-  async function loadItems() {
+  async function loadData() {
     setLoading(true)
-    const data = await getInventoryItems()
-    setItems(data || [])
+    
+    const [inventoryData, locationsData] = await Promise.all([
+      getInventoryItems(),
+      getUserLocations()
+    ])
+    
+    setItems(inventoryData || [])
+    setLocations(locationsData.map(l => l.location_name))
     setLoading(false)
   }
-
-  const categories = Array.from(new Set(items.map(item => item.category))).sort()
 
   const handleEdit = (item: InventoryItem) => {
     setEditingItem({ ...item })
@@ -49,252 +68,247 @@ export default function InventoryPage() {
   const handleSave = async () => {
     if (!editingItem) return
 
-    const updated = await updateInventoryItem(editingItem.id, {
+    const result = await updateInventoryItem(editingItem.id, {
       name: editingItem.name,
-      category: editingItem.category,
+      category: editingItem.category || null,
+      location: editingItem.location || null,
       quantity: editingItem.quantity,
-      unit: editingItem.unit,
-      low_stock_threshold: editingItem.low_stock_threshold
+      notes: editingItem.notes || null
     })
 
-    if (updated) {
-      setItems(items.map(item => item.id === updated.id ? updated : item))
+    if (result) {
+      toast.success('Item updated!')
       setEditingItem(null)
+      await loadData()
+    } else {
+      toast.error('Failed to update item')
     }
   }
 
-  const handleCancel = () => {
-    setEditingItem(null)
+  const handleDelete = async (id: string, name: string) => {
+    if (!confirm(`Delete ${name}?`)) return
+
+    const success = await deleteInventoryItem(id)
+
+    if (success) {
+      toast.success('Item deleted!')
+      await loadData()
+    } else {
+      toast.error('Failed to delete item')
+    }
+  }
+
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-emerald-50 to-teal-100">
+        <div className="text-center">
+          <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-emerald-500"></div>
+          <p className="mt-4 text-gray-600 font-medium">Loading...</p>
+        </div>
+      </div>
+    )
   }
 
   return (
-    <main className="min-h-screen p-4 md:p-8 bg-gradient-to-br from-blue-50 to-indigo-100">
-      <div className="max-w-6xl mx-auto">
-        <div className="flex items-center justify-between mb-6">
-          <h1 className="text-3xl font-bold text-gray-800">Inventory</h1>
-          <Link href="/" className="text-blue-600 hover:text-blue-700">
-            ← Back
-          </Link>
-        </div>
+    <div className="min-h-screen bg-gradient-to-br from-emerald-50 to-teal-100 pb-20">
+      <Toaster position="top-center" />
+      
+      {/* Header */}
+      <div className="bg-white shadow-sm sticky top-0 z-10">
+        <div className="max-w-md mx-auto px-4 py-4">
+          <div className="flex items-center justify-between mb-4">
+            <Link href="/home" className="text-emerald-600 hover:text-emerald-700 font-medium">
+              ← Back
+            </Link>
+            <h1 className="text-xl font-bold text-gray-800">Inventory</h1>
+            <div className="w-16"></div>
+          </div>
 
-        <div className="bg-white rounded-lg shadow-lg p-6 mb-6">
-          <div className="grid md:grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Search
-              </label>
-              <input
-                type="text"
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                placeholder="Search by name or UPC..."
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              />
-            </div>
+          {/* Search */}
+          <input
+            type="text"
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            placeholder="Search items..."
+            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-transparent outline-none mb-2"
+          />
 
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Category
-              </label>
-              <select
-                value={categoryFilter}
-                onChange={(e) => setCategoryFilter(e.target.value)}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              >
-                <option value="">All Categories</option>
-                {categories.map(category => (
-                  <option key={category} value={category}>{category}</option>
-                ))}
-              </select>
-            </div>
-          </div>
-        </div>
-
-        {loading ? (
-          <div className="bg-white rounded-lg shadow-lg p-8 text-center">
-            <div className="text-gray-500">Loading inventory...</div>
-          </div>
-        ) : filteredItems.length === 0 ? (
-          <div className="bg-white rounded-lg shadow-lg p-8 text-center">
-            <div className="text-gray-500">
-              {items.length === 0 
-                ? 'No items in inventory yet. Start by scanning items!'
-                : 'No items match your search criteria.'
-              }
-            </div>
-          </div>
-        ) : (
-          <div className="bg-white rounded-lg shadow-lg overflow-hidden">
-            <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead className="bg-gray-50 border-b border-gray-200">
-                  <tr>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Item
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Category
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      UPC
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Quantity
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Low Stock
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Status
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Actions
-                    </th>
-                  </tr>
-                </thead>
-                <tbody className="bg-white divide-y divide-gray-200">
-                  {filteredItems.map(item => (
-                    <tr key={item.id} className="hover:bg-gray-50">
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        {editingItem?.id === item.id ? (
-                          <input
-                            type="text"
-                            value={editingItem.name}
-                            onChange={(e) => setEditingItem({ ...editingItem, name: e.target.value })}
-                            className="px-2 py-1 border border-gray-300 rounded"
-                          />
-                        ) : (
-                          <div className="text-sm font-medium text-gray-900">{item.name}</div>
-                        )}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        {editingItem?.id === item.id ? (
-                          <select
-                            value={editingItem.category}
-                            onChange={(e) => setEditingItem({ ...editingItem, category: e.target.value })}
-                            className="px-2 py-1 border border-gray-300 rounded text-sm"
-                          >
-                            <option value="Dairy">Dairy</option>
-                            <option value="Produce">Produce</option>
-                            <option value="Meat">Meat</option>
-                            <option value="Bakery">Bakery</option>
-                            <option value="Beverages">Beverages</option>
-                            <option value="Snacks">Snacks</option>
-                            <option value="Household">Household</option>
-                            <option value="Personal Care">Personal Care</option>
-                            <option value="Other">Other</option>
-                          </select>
-                        ) : (
-                          <div className="text-sm text-gray-900">{item.category}</div>
-                        )}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="text-sm text-gray-500">{item.upc}</div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        {editingItem?.id === item.id ? (
-                          <div className="flex gap-1 items-center">
-                            <input
-                              type="number"
-                              value={editingItem.quantity}
-                              onChange={(e) => setEditingItem({ ...editingItem, quantity: parseInt(e.target.value) || 0 })}
-                              className="w-16 px-2 py-1 border border-gray-300 rounded text-sm"
-                            />
-                            <select
-                              value={editingItem.unit}
-                              onChange={(e) => setEditingItem({ ...editingItem, unit: e.target.value })}
-                              className="px-2 py-1 border border-gray-300 rounded text-sm"
-                            >
-                              <option value="count">count</option>
-                              <option value="bottles">bottles</option>
-                              <option value="boxes">boxes</option>
-                              <option value="cans">cans</option>
-                              <option value="lbs">lbs</option>
-                              <option value="oz">oz</option>
-                            </select>
-                          </div>
-                        ) : (
-                          <div className="text-sm text-gray-900">{item.quantity} {item.unit}</div>
-                        )}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        {editingItem?.id === item.id ? (
-                          <input
-                            type="number"
-                            value={editingItem.low_stock_threshold}
-                            onChange={(e) => setEditingItem({ ...editingItem, low_stock_threshold: parseInt(e.target.value) || 0 })}
-                            className="w-16 px-2 py-1 border border-gray-300 rounded text-sm"
-                          />
-                        ) : (
-                          <div className="text-sm text-gray-900">{item.low_stock_threshold} {item.unit}</div>
-                        )}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        {item.quantity <= item.low_stock_threshold ? (
-                          <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-yellow-100 text-yellow-800">
-                            Low Stock
-                          </span>
-                        ) : (
-                          <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">
-                            In Stock
-                          </span>
-                        )}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                        {editingItem?.id === item.id ? (
-                          <div className="flex gap-2">
-                            <button
-                              onClick={handleSave}
-                              className="text-green-600 hover:text-green-900"
-                            >
-                              Save
-                            </button>
-                            <button
-                              onClick={handleCancel}
-                              className="text-red-600 hover:text-red-900"
-                            >
-                              Cancel
-                            </button>
-                          </div>
-                        ) : (
-                          <button
-                            onClick={() => handleEdit(item)}
-                            className="text-blue-600 hover:text-blue-900"
-                          >
-                            Edit
-                          </button>
-                        )}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        )}
-
-        <div className="mt-6 bg-white rounded-lg shadow-lg p-6">
-          <h2 className="text-xl font-semibold mb-4 text-gray-800">Summary</h2>
-          <div className="grid md:grid-cols-3 gap-4">
-            <div className="bg-blue-50 rounded-lg p-4">
-              <div className="text-sm text-blue-600 font-medium">Total Items</div>
-              <div className="text-2xl font-bold text-blue-900">{items.length}</div>
-            </div>
-            <div className="bg-green-50 rounded-lg p-4">
-              <div className="text-sm text-green-600 font-medium">In Stock</div>
-              <div className="text-2xl font-bold text-green-900">
-                {items.filter(item => item.quantity > item.low_stock_threshold).length}
-              </div>
-            </div>
-            <div className="bg-yellow-50 rounded-lg p-4">
-              <div className="text-sm text-yellow-600 font-medium">Low Stock</div>
-              <div className="text-2xl font-bold text-yellow-900">
-                {items.filter(item => item.quantity <= item.low_stock_threshold).length}
-              </div>
-            </div>
-          </div>
+          {/* Location Filter */}
+          {locations.length > 0 && (
+            <select
+              value={locationFilter}
+              onChange={(e) => setLocationFilter(e.target.value)}
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-transparent outline-none"
+            >
+              <option value="">All locations</option>
+              {locations.map((loc) => (
+                <option key={loc} value={loc}>{loc}</option>
+              ))}
+            </select>
+          )}
         </div>
       </div>
-    </main>
+
+      <div className="max-w-md mx-auto px-4 py-6">
+        {/* Stats */}
+        <div className="bg-white rounded-2xl shadow-lg p-4 mb-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <div className="text-2xl font-bold text-gray-800">{filteredItems.length}</div>
+              <div className="text-sm text-gray-600">
+                {searchTerm || locationFilter ? 'Filtered items' : 'Total items'}
+              </div>
+            </div>
+            {(searchTerm || locationFilter) && (
+              <button
+                onClick={() => {
+                  setSearchTerm('')
+                  setLocationFilter('')
+                }}
+                className="text-sm text-emerald-600 hover:text-emerald-700 font-medium"
+              >
+                Clear filters
+              </button>
+            )}
+          </div>
+        </div>
+
+        {/* Items List */}
+        {filteredItems.length === 0 ? (
+          <div className="bg-white rounded-2xl shadow-lg p-8 text-center">
+            <div className="text-5xl mb-4">📦</div>
+            <h2 className="text-lg font-bold text-gray-800 mb-2">
+              {searchTerm || locationFilter ? 'No items found' : 'No items yet'}
+            </h2>
+            <p className="text-gray-600 mb-6">
+              {searchTerm || locationFilter 
+                ? 'Try adjusting your filters' 
+                : 'Start by scanning in your first item!'
+              }
+            </p>
+            {!searchTerm && !locationFilter && (
+              <Link
+                href="/scan-in"
+                className="inline-block bg-emerald-500 hover:bg-emerald-600 text-white font-semibold py-2 px-6 rounded-lg"
+              >
+                Scan In Item
+              </Link>
+            )}
+          </div>
+        ) : (
+          <div className="space-y-3">
+            {filteredItems.map((item) => (
+              <div key={item.id} className="bg-white rounded-xl shadow-lg p-4">
+                {editingItem?.id === item.id ? (
+                  // Edit Mode
+                  <div className="space-y-3">
+                    <input
+                      type="text"
+                      value={editingItem.name}
+                      onChange={(e) => setEditingItem({ ...editingItem, name: e.target.value })}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg font-bold"
+                      placeholder="Item name"
+                    />
+                    <input
+                      type="text"
+                      value={editingItem.category || ''}
+                      onChange={(e) => setEditingItem({ ...editingItem, category: e.target.value })}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                      placeholder="Category"
+                    />
+                    <select
+                      value={editingItem.location || ''}
+                      onChange={(e) => setEditingItem({ ...editingItem, location: e.target.value })}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                    >
+                      <option value="">Select location...</option>
+                      {locations.map((loc) => (
+                        <option key={loc} value={loc}>{loc}</option>
+                      ))}
+                    </select>
+                    <input
+                      type="number"
+                      value={editingItem.quantity}
+                      onChange={(e) => setEditingItem({ ...editingItem, quantity: parseInt(e.target.value) || 1 })}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                      min="1"
+                    />
+                    <textarea
+                      value={editingItem.notes || ''}
+                      onChange={(e) => setEditingItem({ ...editingItem, notes: e.target.value })}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                      placeholder="Notes (optional)"
+                      rows={2}
+                    />
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => setEditingItem(null)}
+                        className="flex-1 bg-gray-200 hover:bg-gray-300 text-gray-700 font-medium py-2 px-4 rounded-lg"
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        onClick={handleSave}
+                        className="flex-1 bg-emerald-500 hover:bg-emerald-600 text-white font-medium py-2 px-4 rounded-lg"
+                      >
+                        Save
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  // View Mode
+                  <div>
+                    <div className="flex items-start justify-between mb-2">
+                      <div className="flex-1">
+                        <h3 className="text-lg font-bold text-gray-800">{item.name}</h3>
+                        <div className="flex flex-wrap gap-2 mt-1">
+                          {item.category && (
+                            <span className="px-2 py-1 bg-blue-100 text-blue-700 text-xs font-medium rounded">
+                              {item.category}
+                            </span>
+                          )}
+                          {item.location && (
+                            <span className="px-2 py-1 bg-purple-100 text-purple-700 text-xs font-medium rounded">
+                              📍 {item.location}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        <div className="text-2xl font-bold text-emerald-600">{item.quantity}</div>
+                        <div className="text-xs text-gray-500">{item.unit}</div>
+                      </div>
+                    </div>
+
+                    <div className="text-xs text-gray-500 mb-3">
+                      <div className="font-mono">{item.upc}</div>
+                      <div>Added {new Date(item.scan_in_date).toLocaleDateString()}</div>
+                      {item.notes && (
+                        <div className="mt-1 text-gray-600 italic">&quot;{item.notes}&quot;</div>
+                      )}
+                    </div>
+
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => handleEdit(item)}
+                        className="flex-1 bg-gray-100 hover:bg-gray-200 text-gray-700 font-medium py-2 px-4 rounded-lg text-sm"
+                      >
+                        ✏️ Edit
+                      </button>
+                      <button
+                        onClick={() => handleDelete(item.id, item.name)}
+                        className="flex-1 bg-red-100 hover:bg-red-200 text-red-700 font-medium py-2 px-4 rounded-lg text-sm"
+                      >
+                        🗑️ Delete
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
   )
 }
