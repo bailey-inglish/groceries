@@ -1,0 +1,17 @@
+PWA Icon Placeholder Files
+
+To complete the PWA setup, you need to add icon files:
+
+1. icon-192.png - 192x192 pixel PNG icon
+2. icon-512.png - 512x512 pixel PNG icon
+
+You can create these icons using any image editor or online tools like:
+- https://www.pwabuilder.com/imageGenerator
+- https://realfavicongenerator.net/
+
+Recommended icon design:
+- Simple, recognizable symbol (e.g., shopping cart or grocery bag)
+- High contrast colors
+- Clean, minimal design that works at small sizes
+
+For now, the app will work but may show default browser icons until these are added.
