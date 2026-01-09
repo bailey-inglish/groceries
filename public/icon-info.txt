@@ -1,0 +1,42 @@
+PWA Icon Setup Instructions
+
+The PWA manifest is currently configured without icons to avoid errors.
+Once you create icons, update the manifest.json to include them.
+
+To add icons:
+
+1. Create two PNG icon files:
+   - icon-192.png (192x192 pixels)
+   - icon-512.png (512x512 pixels)
+
+2. Place them in the /public directory
+
+3. Update manifest.json to include the icons section:
+
+"icons": [
+  {
+    "src": "/icon-192.png",
+    "sizes": "192x192",
+    "type": "image/png",
+    "purpose": "any maskable"
+  },
+  {
+    "src": "/icon-512.png",
+    "sizes": "512x512",
+    "type": "image/png",
+    "purpose": "any maskable"
+  }
+]
+
+Icon Creation Tools:
+- https://www.pwabuilder.com/imageGenerator
+- https://realfavicongenerator.net/
+- Canva, Figma, or any image editor
+
+Recommended Design:
+- Simple, recognizable symbol (e.g., shopping cart 🛒 or grocery bag 🛍️)
+- High contrast colors
+- Clean, minimal design that works at small sizes
+- Use your brand colors (currently blue #3b82f6)
+
+Until icons are added, the app will work but browsers will use default placeholder icons.
