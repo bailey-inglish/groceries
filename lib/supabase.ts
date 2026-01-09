@@ -420,8 +420,9 @@ export async function generateShoppingPredictions(): Promise<void> {
 
   // Analyze each item
   for (const [upc, records] of Object.entries(itemGroups)) {
-    const scanIns = records.filter(r => r.action === 'scan_in')
-    const scanOuts = records.filter(r => r.action === 'scan_out')
+    const typedRecords = records as InventoryHistory[]
+    const scanIns = typedRecords.filter(r => r.action === 'scan_in')
+    const scanOuts = typedRecords.filter(r => r.action === 'scan_out')
 
     // Need at least 2 complete cycles (scan in -> scan out) to predict
     if (scanIns.length < 2 || scanOuts.length < 2) continue
