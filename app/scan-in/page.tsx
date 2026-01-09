@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import { supabase, scanInItem, getUserLocations, addUserLocation } from '@/lib/supabase'
+import { supabase, scanInItem, getUserLocations, addUserLocation, lookupUPC } from '@/lib/supabase'
 import { toast, Toaster } from 'sonner'
 import BarcodeScanner from '@/components/BarcodeScanner'
 import Link from 'next/link'
@@ -41,10 +41,25 @@ export default function ScanInPage() {
     checkAuth()
   }, [router])
 
-  const handleBarcodeScanned = (barcode: string) => {
+  const handleBarcodeScanned = async (barcode: string) => {
     setScannedBarcode(barcode)
     setShowScanner(false)
     toast.success(`Scanned: ${barcode}`)
+    
+    // Try to look up product info automatically
+    toast.loading('Looking up product info...')
+    const productInfo = await lookupUPC(barcode)
+    
+    if (productInfo.name) {
+      setItemName(productInfo.name)
+      toast.success(`Found: ${productInfo.name}`)
+    } else {
+      toast.info('Product not found in database. Please enter name manually.')
+    }
+    
+    if (productInfo.category) {
+      setCategory(productInfo.category)
+    }
   }
 
   const handleAddLocation = async () => {

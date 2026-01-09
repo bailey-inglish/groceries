@@ -2,6 +2,8 @@
 
 A beautiful, mobile-first Progressive Web App for smart grocery inventory management. Track what you have, predict what you'll need, never run out.
 
+🌐 **Live App**: [easygroceries.vercel.app](https://easygroceries.vercel.app)
+
 ![Version](https://img.shields.io/badge/version-2.0.0-emerald)
 ![Next.js](https://img.shields.io/badge/Next.js-15-black)
 ![TypeScript](https://img.shields.io/badge/TypeScript-5-blue)

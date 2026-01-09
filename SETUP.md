@@ -106,15 +106,14 @@ Follow these steps to get your Groceries PWA up and running in minutes.
    - Wait ~2 minutes for deployment
 
 3. **Update Supabase redirect URLs**
-   - Copy your Vercel deployment URL (e.g., `https://groceries-abc123.vercel.app`)
    - Go to Supabase Dashboard → "Authentication" → "URL Configuration"
-   - Set "Site URL" to your Vercel URL
-   - Add your Vercel URL to "Redirect URLs"
+   - Set "Site URL" to `https://easygroceries.vercel.app`
+   - Add `https://easygroceries.vercel.app/auth-callback` to "Redirect URLs"
    - Click "Save"
 
 4. **Test in production**
-   - Visit your Vercel URL
-   - Try logging in with magic link
+   - Visit [easygroceries.vercel.app](https://easygroceries.vercel.app)
+   - Try logging in with OTP code (PWA) or magic link (desktop)
    - Test barcode scanning (requires HTTPS ✓)
    - Install as PWA on your phone!
 

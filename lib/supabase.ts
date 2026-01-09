@@ -68,6 +68,37 @@ export interface UserLocation {
 }
 
 // ====================================================================
+// UPC LOOKUP
+// ====================================================================
+
+// Look up product info by UPC using Open Food Facts API (free, open-source)
+export async function lookupUPC(upc: string): Promise<{ name?: string; category?: string }> {
+  try {
+    // Open Food Facts API - completely free, no API key needed
+    const response = await fetch(`https://world.openfoodfacts.org/api/v2/product/${upc}.json`)
+    
+    if (!response.ok) return {}
+    
+    const data = await response.json()
+    
+    if (data.status === 1 && data.product) {
+      const product = data.product
+      return {
+        name: product.product_name || product.product_name_en || undefined,
+        category: product.categories_tags?.[0]?.replace('en:', '').replace(/-/g, ' ') || 
+                  product.food_groups || 
+                  undefined
+      }
+    }
+    
+    return {}
+  } catch (error) {
+    console.error('UPC lookup failed:', error)
+    return {}
+  }
+}
+
+// ====================================================================
 // INVENTORY ITEMS
 // ====================================================================
 

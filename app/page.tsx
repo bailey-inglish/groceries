@@ -93,7 +93,7 @@ export default function LoginPage() {
         toast.success('Check your email for a 6-digit code!')
       } else {
         // For desktop: send magic link
-        const redirectUrl = `${window.location.origin}/auth-callback`
+        const redirectUrl = 'https://easygroceries.vercel.app/auth-callback'
         const { error } = await supabase.auth.signInWithOtp({
           email: email.trim(),
           options: {
@@ -165,7 +165,7 @@ export default function LoginPage() {
     setDeferredPrompt(null)
   }
 
-  const currentUrl = typeof window !== 'undefined' ? window.location.href : ''
+  const currentUrl = 'https://easygroceries.vercel.app'
 
   // Desktop view - show QR code
   if (!isMobile) {
