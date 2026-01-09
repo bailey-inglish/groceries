@@ -17,6 +17,9 @@ export default function BarcodeScanner({ onScan, onError }: BarcodeScannerProps)
   useEffect(() => {
     readerRef.current = new BrowserMultiFormatReader()
     
+    // Auto-start scanning when component mounts
+    startScanning()
+    
     return () => {
       if (readerRef.current) {
         readerRef.current.reset()

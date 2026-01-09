@@ -15,6 +15,9 @@ export default function LoginPage() {
   const [isInstalled, setIsInstalled] = useState(false)
   const [showInstallPrompt, setShowInstallPrompt] = useState(false)
   const [deferredPrompt, setDeferredPrompt] = useState<any>(null)
+  const [otpSent, setOtpSent] = useState(false)
+  const [otpCode, setOtpCode] = useState('')
+  const [verifyingOtp, setVerifyingOtp] = useState(false)
   const router = useRouter()
 
   useEffect(() => {
@@ -60,27 +63,91 @@ export default function LoginPage() {
 
     setLoading(true)
 
-    const redirectUrl = typeof window !== 'undefined' 
-      ? `${window.location.origin}/auth-callback` 
-      : undefined
+    const isPwa = window.matchMedia('(display-mode: standalone)').matches || 
+                  (window.navigator as any).standalone === true
 
-    const { error } = await supabase.auth.signInWithOtp({
-      email: email.trim(),
-      options: {
-        emailRedirectTo: redirectUrl,
-      },
-    })
+    try {
+      if (isPwa || isMobile) {
+        // For PWA/mobile: send OTP token (6-digit code)
+        const { error } = await supabase.auth.signInWithOtp({
+          email: email.trim(),
+          options: {
+            shouldCreateUser: true,
+          },
+        })
 
-    setLoading(false)
+        if (error) {
+          if (error.message?.includes('only request this after')) {
+            const match = error.message.match(/(\d+)\s+seconds/)
+            const seconds = match ? match[1] : '60'
+            toast.error(`Please wait ${seconds} seconds before requesting another code.`)
+          } else {
+            toast.error(error.message || 'Failed to send verification code')
+          }
+          setLoading(false)
+          return
+        }
 
-    if (error) {
-      toast.error(error.message || 'Failed to send magic link')
-      return
+        setOtpSent(true)
+        setSentToEmail(email)
+        toast.success('Check your email for a 6-digit code!')
+      } else {
+        // For desktop: send magic link
+        const redirectUrl = `${window.location.origin}/auth-callback`
+        const { error } = await supabase.auth.signInWithOtp({
+          email: email.trim(),
+          options: {
+            emailRedirectTo: redirectUrl,
+          },
+        })
+
+        if (error) {
+          if (error.message?.includes('only request this after')) {
+            const match = error.message.match(/(\d+)\s+seconds/)
+            const seconds = match ? match[1] : '60'
+            toast.error(`Please wait ${seconds} seconds before requesting another link.`)
+          } else {
+            toast.error(error.message || 'Failed to send login link')
+          }
+          setLoading(false)
+          return
+        }
+
+        setMagicLinkSent(true)
+        setSentToEmail(email)
+        toast.success('Check your email for the magic link!')
+      }
+    } catch (err: any) {
+      toast.error('Unexpected error occurred')
+    } finally {
+      setLoading(false)
     }
+  }
 
-    setMagicLinkSent(true)
-    setSentToEmail(email)
-    toast.success('Check your email for the magic link!')
+  const verifyOtpCode = async () => {
+    if (!otpCode.trim() || !sentToEmail) return
+    
+    setVerifyingOtp(true)
+
+    try {
+      const { error, data } = await supabase.auth.verifyOtp({
+        email: sentToEmail,
+        token: otpCode.trim(),
+        type: 'email',
+      })
+
+      if (error) {
+        toast.error('Invalid or expired code. Try again.')
+        setVerifyingOtp(false)
+        return
+      }
+
+      toast.success('Signed in successfully!')
+      router.replace('/home')
+    } catch (err: any) {
+      toast.error('Verification failed')
+      setVerifyingOtp(false)
+    }
   }
 
   const handleInstallClick = async () => {
@@ -184,7 +251,56 @@ export default function LoginPage() {
     )
   }
 
-  // Mobile - installed or skipped install - show login
+  // Mobile - installed or skipped install - show OTP or magic link confirmation
+  if (otpSent) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-emerald-50 to-teal-100 p-4">
+        <Toaster position="top-center" />
+        <div className="bg-white rounded-2xl shadow-2xl p-8 max-w-md w-full">
+          <div className="text-center mb-6">
+            <div className="text-6xl mb-4">🔢</div>
+            <h2 className="text-2xl font-bold text-gray-800 mb-2">Enter verification code</h2>
+            <p className="text-gray-600">
+              We sent a 6-digit code to <span className="font-semibold">{sentToEmail}</span>
+            </p>
+          </div>
+
+          <div className="space-y-4">
+            <input
+              type="text"
+              value={otpCode}
+              onChange={(e) => setOtpCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
+              placeholder="000000"
+              className="w-full px-4 py-3 border border-gray-300 rounded-lg text-center text-2xl font-mono tracking-widest focus:ring-2 focus:ring-emerald-500 focus:border-transparent outline-none"
+              maxLength={6}
+              autoFocus
+            />
+
+            <button
+              onClick={verifyOtpCode}
+              disabled={verifyingOtp || otpCode.length !== 6}
+              className="w-full bg-emerald-500 hover:bg-emerald-600 disabled:bg-gray-300 disabled:cursor-not-allowed text-white font-semibold py-3 px-6 rounded-lg shadow-md transition-all"
+            >
+              {verifyingOtp ? 'Verifying...' : 'Verify Code'}
+            </button>
+
+            <button
+              onClick={() => {
+                setOtpSent(false)
+                setSentToEmail('')
+                setOtpCode('')
+                setEmail('')
+              }}
+              className="w-full text-emerald-600 hover:text-emerald-700 font-semibold text-sm"
+            >
+              ← Try a different email
+            </button>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
   if (magicLinkSent) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-emerald-50 to-teal-100 p-4">
