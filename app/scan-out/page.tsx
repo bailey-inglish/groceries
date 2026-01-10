@@ -154,7 +154,7 @@ export default function ScanOutPage() {
                 )}
                 <div>
                   <div className="text-gray-600">Quantity</div>
-                  <div className="font-medium text-gray-900">{foundItem.quantity}</div>
+                  <div className="font-medium text-gray-900">{foundItem.quantity > 1 ? `${foundItem.quantity}x` : foundItem.quantity}</div>
                 </div>
               </div>
 

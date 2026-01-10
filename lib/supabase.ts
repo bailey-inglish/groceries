@@ -206,7 +206,20 @@ export async function getInventoryItems(): Promise<InventoryItem[]> {
     return []
   }
 
-  return data || []
+  // Group by UPC and sum quantities
+  const grouped = {} as Record<string, InventoryItem>
+  
+  (data || []).forEach(item => {
+    if (grouped[item.upc]) {
+      // Accumulate quantity
+      grouped[item.upc].quantity += item.quantity
+    } else {
+      // First item with this UPC
+      grouped[item.upc] = { ...item }
+    }
+  })
+
+  return Object.values(grouped)
 }
 
 export async function getInventoryItemByUPC(upc: string): Promise<InventoryItem | null> {
@@ -493,13 +506,50 @@ export async function convertSuggestionToDefinite(id: string): Promise<boolean> 
 }
 
 export async function markShoppingItemPurchased(id: string): Promise<boolean> {
-  const { error } = await supabase
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return false
+
+  // Get the shopping item to extract its info
+  const { data: shoppingItem, error: getError } = await supabase
+    .from('shopping_list')
+    .select('*')
+    .eq('id', id)
+    .single()
+
+  if (getError || !shoppingItem) {
+    console.error('Error fetching shopping item:', getError)
+    return false
+  }
+
+  // Update shopping list to mark as purchased
+  const { error: updateError } = await supabase
     .from('shopping_list')
     .update({ purchased: true, updated_at: new Date().toISOString() })
     .eq('id', id)
 
-  if (error) {
-    console.error('Error marking item as purchased:', error)
+  if (updateError) {
+    console.error('Error marking item as purchased:', updateError)
+    return false
+  }
+
+  // Add item back to inventory
+  const { error: addError } = await supabase
+    .from('inventory_items')
+    .insert({
+      user_id: user.id,
+      name: shoppingItem.item_name,
+      upc: shoppingItem.upc || '',
+      category: shoppingItem.category,
+      location: null,
+      quantity: shoppingItem.quantity || 1,
+      unit: 'unit',
+      scan_in_date: new Date().toISOString(),
+      add_to_shopping_list: false,
+      notes: 'Added from shopping list'
+    })
+
+  if (addError) {
+    console.error('Error adding item to inventory:', addError)
     return false
   }
 
