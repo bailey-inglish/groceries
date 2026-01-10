@@ -130,16 +130,6 @@ export async function lookupUPC(upc: string): Promise<{ name?: string; category?
  */
 export async function getUserProductInfo(upc: string): Promise<UserProductInfo | null> {
   const { data: { user } } = await supabase.auth.getUser()
-// ====================================================================
-// USER PRODUCT INFO (UPC -> Preferred Name/Category/Location)
-// ====================================================================
-
-/**
- * Get user's saved product info for a UPC code.
- * Returns null if the user hasn't scanned this UPC before.
- */
-export async function getUserProductInfo(upc: string): Promise<UserProductInfo | null> {
-  const { data: { user } } = await supabase.auth.getUser()
   if (!user) {
     console.error('User not authenticated')
     return null
@@ -187,64 +177,6 @@ export async function saveUserProductInfo(
         preferred_location: preferredLocation,
       },
     ], {
-      onConflict: 'user_id,upc'
-    })
-    .select()
-    .single()
-
-  if (error) {
-    console.error('Error saving user product info:', error)
-    return null
-  }
-
-  return data
-}
-
-  if (!user) {
-    console.error('User not authenticated')
-    return null
-  }
-
-  const { data, error } = await supabase
-    .from('user_product_info')
-    .select('*')
-    .eq('user_id', user.id)
-    .eq('upc', upc)
-    .maybeSingle()
-
-  if (error) {
-    console.error('Error fetching user product info:', error)
-    return null
-  }
-
-  return data
-}
-
-/**
- * Save user's preferred product info for a UPC code.
- * Updates existing record or creates new one.
- */
-export async function saveUserProductInfo(
-  upc: string,
-  preferredName: string,
-  preferredCategory: string | null = null,
-  preferredLocation: string | null = null
-): Promise<UserProductInfo | null> {
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) {
-    console.error('User not authenticated')
-    return null
-  }
-
-  const { data, error } = await supabase
-    .from('user_product_info')
-    .upsert([{
-      user_id: user.id,
-      upc,
-      preferred_name: preferredName,
-      preferred_category: preferredCategory,
-      preferred_location: preferredLocation,
-    }], {
       onConflict: 'user_id,upc'
     })
     .select()
@@ -408,7 +340,7 @@ export async function scanOutItem(
 
 export async function updateInventoryItem(
   id: string,
-  updates: Partial<Pick<InventoryItem, 'name' | 'category' | 'location' | 'notes'>
+  updates: Partial<Pick<InventoryItem, 'name' | 'category' | 'location' | 'notes'>>
 ): Promise<InventoryItem | null> {
   const { data, error } = await supabase
     .from('inventory_items')
