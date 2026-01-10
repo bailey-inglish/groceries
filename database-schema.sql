@@ -75,6 +75,7 @@ CREATE TABLE shopping_list (
   last_scan_out_date TIMESTAMP WITH TIME ZONE,
   average_days_between_purchases DECIMAL,
   purchased BOOLEAN NOT NULL DEFAULT FALSE,
+  dismissed_at TIMESTAMP WITH TIME ZONE, -- timestamp when user dismissed this suggestion
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );

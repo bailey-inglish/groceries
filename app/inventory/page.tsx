@@ -263,7 +263,7 @@ export default function InventoryPage() {
                       </div>
                       <div className="text-right">
                         <div className="text-2xl font-bold text-blue-600">
-                          {item.quantity > 1 ? `${item.quantity}x` : item.quantity}
+                          {item.quantity > 1 ? `${item.quantity}x` : ''}
                         </div>
                       </div>
                     </div>

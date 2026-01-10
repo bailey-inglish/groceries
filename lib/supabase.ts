@@ -417,6 +417,7 @@ export async function getShoppingList(): Promise<ShoppingListItem[]> {
     .from('shopping_list')
     .select('*')
     .eq('purchased', false)
+    .is('dismissed_at', null) // Exclude dismissed items
     .order('is_suggested', { ascending: true }) // Definite items first
     .order('created_at', { ascending: false })
 
@@ -557,14 +558,37 @@ export async function markShoppingItemPurchased(id: string): Promise<boolean> {
 }
 
 export async function removeFromShoppingList(id: string): Promise<boolean> {
-  const { error } = await supabase
+  // Get the item to check if it's a suggestion
+  const { data: item } = await supabase
     .from('shopping_list')
-    .delete()
+    .select('*')
     .eq('id', id)
+    .single()
 
-  if (error) {
-    console.error('Error removing from shopping list:', error)
-    return false
+  if (!item) return false
+
+  if (item.is_suggested) {
+    // For suggestions, mark as dismissed instead of deleting
+    const { error } = await supabase
+      .from('shopping_list')
+      .update({ dismissed_at: new Date().toISOString() })
+      .eq('id', id)
+
+    if (error) {
+      console.error('Error dismissing suggestion:', error)
+      return false
+    }
+  } else {
+    // For definite items, delete them
+    const { error } = await supabase
+      .from('shopping_list')
+      .delete()
+      .eq('id', id)
+
+    if (error) {
+      console.error('Error removing from shopping list:', error)
+      return false
+    }
   }
 
   return true
@@ -625,31 +649,61 @@ export async function generateShoppingPredictions(): Promise<void> {
     if (daysUntilExpected <= leadWindow) {
       const confidence = Math.min(1, scanIns.length / 5) // More data = higher confidence
 
-      // Check if already in shopping list
+      // Check if already in shopping list (not dismissed)
       const { data: existing } = await supabase
         .from('shopping_list')
         .select('*')
         .eq('upc', upc)
         .eq('user_id', user.id)
         .eq('purchased', false)
+        .is('dismissed_at', null)
         .maybeSingle()
 
-      if (!existing) {
-        // Add as suggestion
-        await supabase
-          .from('shopping_list')
-          .insert([{
-            user_id: user.id,
-            item_name: lastScanOut.item_name,
-            upc,
-            category: lastScanOut.category,
-            quantity: 1,
-            is_suggested: true,
-            prediction_confidence: confidence,
-            last_scan_out_date: lastScanOut.scan_date,
-            average_days_between_purchases: avgDays
-          }])
+      if (existing) {
+        // Item already in list, skip
+        continue
       }
+
+      // Check if item was recently dismissed - adaptive delay based on confidence
+      const { data: dismissed } = await supabase
+        .from('shopping_list')
+        .select('*')
+        .eq('upc', upc)
+        .eq('user_id', user.id)
+        .not('dismissed_at', 'is', null)
+        .order('dismissed_at', { ascending: false })
+        .limit(1)
+
+      if (dismissed && dismissed.length > 0) {
+        const dismissedItem = dismissed[0]
+        const dismissedAt = new Date(dismissedItem.dismissed_at).getTime()
+        const hoursSinceDismissal = (Date.now() - dismissedAt) / (1000 * 60 * 60)
+        
+        // Adaptive delay: Low confidence = suggest sooner, high confidence = wait longer
+        // Low confidence (0.2): re-suggest after 24 hours
+        // High confidence (1.0): re-suggest after 7 days
+        const minHoursBetweenSuggestions = 24 + (confidence * 144) // 24 to 168 hours
+        
+        if (hoursSinceDismissal < minHoursBetweenSuggestions) {
+          // Too soon to suggest again
+          continue
+        }
+      }
+
+      // Add as suggestion
+      await supabase
+        .from('shopping_list')
+        .insert([{
+          user_id: user.id,
+          item_name: lastScanOut.item_name,
+          upc,
+          category: lastScanOut.category,
+          quantity: 1,
+          is_suggested: true,
+          prediction_confidence: confidence,
+          last_scan_out_date: lastScanOut.scan_date,
+          average_days_between_purchases: avgDays
+        }])
     }
   }
 }

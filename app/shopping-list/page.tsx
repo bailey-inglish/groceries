@@ -225,7 +225,7 @@ export default function ShoppingListPage() {
                       )}
                     </div>
                     <div className="text-right">
-                      <div className="text-xl font-bold text-gray-800">{item.quantity > 1 ? `${item.quantity}x` : item.quantity}</div>
+                      <div className="text-xl font-bold text-gray-800">{item.quantity > 1 ? `${item.quantity}x` : ''}</div>
                     </div>
                   </div>
                   <div className="flex gap-2">
