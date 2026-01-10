@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import { supabase, scanInItem, getUserLocations, addUserLocation, lookupUPC } from '@/lib/supabase'
+import { supabase, scanInItem, getUserLocations, addUserLocation, lookupUPC, getUserProductInfo, saveUserProductInfo } from '@/lib/supabase'
 import { toast, Toaster } from 'sonner'
 import BarcodeScanner from '@/components/BarcodeScanner'
 import Link from 'next/link'
@@ -45,17 +45,43 @@ export default function ScanInPage() {
   const handleBarcodeScanned = async (barcode: string) => {
     setScannedBarcode(barcode)
     setShowScanner(false)
-    toast.success(`Scanned: ${barcode}`)
-    
-    // Try to look up product info automatically
-    toast.loading('Looking up product info...')
+    toast.success(`Scanned: ${barcode}`, { duration: 2000 })
+
+    // First, try to use saved preferences for this UPC
+    const savedInfo = await getUserProductInfo(barcode)
+    if (savedInfo) {
+      const added = await scanInItem(
+        barcode,
+        savedInfo.preferred_name,
+        savedInfo.preferred_category,
+        savedInfo.preferred_location,
+        quantity
+      )
+
+      if (added) {
+        toast.success(`Added ${savedInfo.preferred_name} from saved info`, { duration: 3000 })
+        setScannedBarcode('')
+        setItemName('')
+        setCategory('')
+        setLocation(savedInfo.preferred_location || '')
+        setQuantity(1)
+        setShowScanner(true)
+        return
+      } else {
+        toast.error('Failed to auto-add item', { duration: 5000 })
+      }
+    }
+
+    // If no saved info, try to look up product info automatically
+    const loadingToast = toast.loading('Looking up product info...', { duration: Infinity })
     const productInfo = await lookupUPC(barcode)
+    toast.dismiss(loadingToast)
     
     if (productInfo.name) {
       setItemName(productInfo.name)
-      toast.success(`Found: ${productInfo.name}`)
+      toast.success(`Found: ${productInfo.name}`, { duration: 3000 })
     } else {
-      toast.info('Product not found in database. Please enter name manually.')
+      toast.info('Product not found in database. Please enter name manually.', { duration: 4000 })
     }
     
     if (productInfo.category) {
@@ -65,7 +91,7 @@ export default function ScanInPage() {
 
   const handleAddLocation = async () => {
     if (!newLocation.trim()) {
-      toast.error('Please enter a location name')
+      toast.error('Please enter a location name', { duration: 5000 })
       return
     }
 
@@ -75,9 +101,9 @@ export default function ScanInPage() {
       setLocation(newLocation.trim())
       setNewLocation('')
       setShowLocationInput(false)
-      toast.success('Location added!')
+      toast.success('Location added!', { duration: 3000 })
     } else {
-      toast.error('Failed to add location')
+      toast.error('Failed to add location', { duration: 5000 })
     }
   }
 
@@ -85,12 +111,12 @@ export default function ScanInPage() {
     e.preventDefault()
 
     if (!scannedBarcode) {
-      toast.error('Please scan a barcode first')
+      toast.error('Please scan a barcode first', { duration: 5000 })
       return
     }
 
     if (!itemName.trim()) {
-      toast.error('Please enter an item name')
+      toast.error('Please enter an item name', { duration: 5000 })
       return
     }
 
@@ -107,7 +133,13 @@ export default function ScanInPage() {
     setLoading(false)
 
     if (result) {
-      toast.success(`${itemName} added to inventory!`)
+      toast.success(`${itemName} added to inventory!`, { duration: 3000 })
+      await saveUserProductInfo(
+        scannedBarcode,
+        itemName.trim(),
+        category.trim() || null,
+        location.trim() || null
+      )
       
       // Reset form
       setScannedBarcode('')
@@ -116,13 +148,13 @@ export default function ScanInPage() {
       setQuantity(1)
       setShowScanner(true)
     } else {
-      toast.error('Failed to add item')
+      toast.error('Failed to add item', { duration: 5000 })
     }
   }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100">
-      <Toaster position="top-center" />
+      <Toaster position="bottom-right" />
       
       {/* Header */}
       <div className="bg-white border-b border-gray-200">
@@ -141,7 +173,7 @@ export default function ScanInPage() {
             <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4 mb-6">
               <BarcodeScanner
                 onScan={handleBarcodeScanned}
-                onError={(error) => toast.error(error)}
+                onError={(error) => toast.error(error, { duration: 5000 })}
               />
             </div>
             
@@ -219,7 +251,7 @@ export default function ScanInPage() {
                   value={itemName}
                   onChange={(e) => setItemName(e.target.value)}
                   placeholder="e.g., Cheez-Its"
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all text-gray-900 placeholder:text-gray-500"
                   required
                   autoFocus
                 />
@@ -236,7 +268,7 @@ export default function ScanInPage() {
                   value={category}
                   onChange={(e) => setCategory(e.target.value)}
                   placeholder="e.g., Snacks"
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all text-gray-900 placeholder:text-gray-500"
                 />
               </div>
 
@@ -251,7 +283,7 @@ export default function ScanInPage() {
                       id="location"
                       value={location}
                       onChange={(e) => setLocation(e.target.value)}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all text-gray-900"
                     >
                       <option value="">Select location...</option>
                       {locations.map((loc) => (
@@ -273,7 +305,7 @@ export default function ScanInPage() {
                       value={newLocation}
                       onChange={(e) => setNewLocation(e.target.value)}
                       placeholder="e.g., Pantry, Fridge"
-                      className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all"
+                      className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all text-gray-900 placeholder:text-gray-500"
                       autoFocus
                     />
                     <button
@@ -308,7 +340,7 @@ export default function ScanInPage() {
                   value={quantity}
                   onChange={(e) => setQuantity(Math.max(1, parseInt(e.target.value) || 1))}
                   min="1"
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all text-gray-900"
                 />
               </div>
 

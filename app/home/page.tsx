@@ -68,7 +68,7 @@ export default function HomePage() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100">
-      <Toaster position="top-center" />
+      <Toaster position="bottom-right" />
       
       {/* Header */}
       <div className="bg-white border-b border-gray-200">

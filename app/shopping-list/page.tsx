@@ -32,7 +32,7 @@ export default function ShoppingListPage() {
         return
       }
       
-      await loadData()
+      await runPredictionsAndLoad()
     }
 
     checkAuth()
@@ -45,48 +45,48 @@ export default function ShoppingListPage() {
     setLoading(false)
   }
 
-  async function handleRefreshPredictions() {
+  async function runPredictionsAndLoad() {
     setRefreshing(true)
-    toast.info('Analyzing your usage patterns...')
+    toast.info('Analyzing your usage patterns...', { duration: 2000 })
     await generateShoppingPredictions()
     await loadData()
     setRefreshing(false)
-    toast.success('Shopping list updated!')
+    toast.success('Shopping list updated!', { duration: 3000 })
   }
 
   async function handleAddToDefinite(id: string) {
     const success = await convertSuggestionToDefinite(id)
     if (success) {
-      toast.success('Added to your list!')
+      toast.success('Added to your list!', { duration: 3000 })
       await loadData()
     } else {
-      toast.error('Failed to add item')
+      toast.error('Failed to add item', { duration: 5000 })
     }
   }
 
   async function handleMarkPurchased(id: string, name: string) {
     const success = await markShoppingItemPurchased(id)
     if (success) {
-      toast.success(`${name} marked as purchased!`)
+      toast.success(`${name} marked as purchased!`, { duration: 3000 })
       await loadData()
     } else {
-      toast.error('Failed to mark as purchased')
+      toast.error('Failed to mark as purchased', { duration: 5000 })
     }
   }
 
   async function handleRemove(id: string) {
     const success = await removeFromShoppingList(id)
     if (success) {
-      toast.success('Item removed')
+      toast.success('Item removed', { duration: 3000 })
       await loadData()
     } else {
-      toast.error('Failed to remove item')
+      toast.error('Failed to remove item', { duration: 5000 })
     }
   }
 
   async function handleAddManualItem() {
     if (!newItemName.trim()) {
-      toast.error('Please enter an item name')
+      toast.error('Please enter an item name', { duration: 5000 })
       return
     }
 
@@ -98,13 +98,13 @@ export default function ShoppingListPage() {
     )
 
     if (result) {
-      toast.success('Item added!')
+      toast.success('Item added!', { duration: 3000 })
       setNewItemName('')
       setNewItemCategory('')
       setShowAddManual(false)
       await loadData()
     } else {
-      toast.error('Failed to add item')
+      toast.error('Failed to add item', { duration: 5000 })
     }
   }
 
@@ -124,7 +124,7 @@ export default function ShoppingListPage() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-emerald-50 to-teal-100 pb-20">
-      <Toaster position="top-center" />
+      <Toaster position="bottom-right" />
       
       {/* Header */}
       <div className="bg-white shadow-sm sticky top-0 z-10">
@@ -134,16 +134,9 @@ export default function ShoppingListPage() {
               ← Back
             </Link>
             <h1 className="text-xl font-bold text-gray-800">Shopping List</h1>
-            <button
-              onClick={handleRefreshPredictions}
-              disabled={refreshing}
-              className="text-emerald-600 hover:text-emerald-700 disabled:opacity-50"
-              title="Refresh predictions"
-            >
-              <svg className={`w-6 h-6 ${refreshing ? 'animate-spin' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-              </svg>
-            </button>
+            <div className="text-sm text-gray-500 flex items-center gap-2">
+              {refreshing ? 'Updating…' : ''}
+            </div>
           </div>
         </div>
       </div>
@@ -183,7 +176,7 @@ export default function ShoppingListPage() {
                 value={newItemName}
                 onChange={(e) => setNewItemName(e.target.value)}
                 placeholder="Item name"
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-transparent outline-none"
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-transparent outline-none text-gray-900 placeholder:text-gray-500"
                 autoFocus
               />
               <input
@@ -191,7 +184,7 @@ export default function ShoppingListPage() {
                 value={newItemCategory}
                 onChange={(e) => setNewItemCategory(e.target.value)}
                 placeholder="Category (optional)"
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-transparent outline-none"
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-transparent outline-none text-gray-900 placeholder:text-gray-500"
               />
               <div className="flex gap-2">
                 <button

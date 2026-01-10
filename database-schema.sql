@@ -21,7 +21,7 @@ CREATE TABLE inventory_items (
   upc TEXT NOT NULL,
   category TEXT,
   location TEXT, -- e.g., "Pantry", "Fridge", "Freezer", custom locations
-  quantity INTEGER NOT NULL DEFAULT 1,
+  quantity INTEGER NOT NULL DEFAULT 1 CHECK (quantity = 1),
   unit TEXT NOT NULL DEFAULT 'count',
   scan_in_date TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
   scan_out_date TIMESTAMP WITH TIME ZONE,
@@ -100,6 +100,28 @@ CREATE TABLE user_locations (
 CREATE INDEX idx_user_locations_user_id ON user_locations(user_id);
 
 -- ====================================================================
+-- USER PRODUCT INFO TABLE
+-- ====================================================================
+-- Store user-specific preferred names, categories, and locations for UPCs
+-- This allows auto-fill on subsequent scans of the same barcode
+CREATE TABLE user_product_info (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  upc TEXT NOT NULL,
+  preferred_name TEXT NOT NULL,
+  preferred_category TEXT,
+  preferred_location TEXT,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  UNIQUE(user_id, upc)
+);
+
+-- Indexes
+CREATE INDEX idx_user_product_info_user_id ON user_product_info(user_id);
+CREATE INDEX idx_user_product_info_upc ON user_product_info(upc);
+CREATE INDEX idx_user_product_info_user_upc ON user_product_info(user_id, upc);
+
+-- ====================================================================
 -- ROW LEVEL SECURITY (RLS) POLICIES
 -- ====================================================================
 
@@ -108,6 +130,7 @@ ALTER TABLE inventory_items ENABLE ROW LEVEL SECURITY;
 ALTER TABLE inventory_history ENABLE ROW LEVEL SECURITY;
 ALTER TABLE shopping_list ENABLE ROW LEVEL SECURITY;
 ALTER TABLE user_locations ENABLE ROW LEVEL SECURITY;
+ALTER TABLE user_product_info ENABLE ROW LEVEL SECURITY;
 
 -- inventory_items policies
 CREATE POLICY "Users can view their own inventory items"
@@ -169,6 +192,23 @@ CREATE POLICY "Users can delete their own locations"
   ON user_locations FOR DELETE
   USING (auth.uid() = user_id);
 
+-- user_product_info policies
+CREATE POLICY "Users can view their own product info"
+  ON user_product_info FOR SELECT
+  USING (auth.uid() = user_id);
+
+CREATE POLICY "Users can insert their own product info"
+  ON user_product_info FOR INSERT
+  WITH CHECK (auth.uid() = user_id);
+
+CREATE POLICY "Users can update their own product info"
+  ON user_product_info FOR UPDATE
+  USING (auth.uid() = user_id);
+
+CREATE POLICY "Users can delete their own product info"
+  ON user_product_info FOR DELETE
+  USING (auth.uid() = user_id);
+
 -- ====================================================================
 -- FUNCTIONS
 -- ====================================================================
@@ -187,4 +227,7 @@ CREATE TRIGGER update_inventory_items_updated_at BEFORE UPDATE ON inventory_item
   FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
 CREATE TRIGGER update_shopping_list_updated_at BEFORE UPDATE ON shopping_list
+  FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+CREATE TRIGGER update_user_product_info_updated_at BEFORE UPDATE ON user_product_info
   FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();

@@ -67,6 +67,28 @@ export interface UserLocation {
   created_at: string
 }
 
+export interface UserProductInfo {
+  id: string
+  user_id: string
+  upc: string
+  preferred_name: string
+  preferred_category: string | null
+  preferred_location: string | null
+  created_at: string
+  updated_at: string
+}
+
+export interface UserProductInfo {
+  id: string
+  user_id: string
+  upc: string
+  preferred_name: string
+  preferred_category: string | null
+  preferred_location: string | null
+  created_at: string
+  updated_at: string
+}
+
 // ====================================================================
 // UPC LOOKUP
 // ====================================================================
@@ -99,6 +121,144 @@ export async function lookupUPC(upc: string): Promise<{ name?: string; category?
 }
 
 // ====================================================================
+// USER PRODUCT INFO (UPC -> Preferred Name/Category/Location)
+// ====================================================================
+
+/**
+ * Get user's saved product info for a UPC code.
+ * Returns null if the user hasn't scanned this UPC before.
+ */
+export async function getUserProductInfo(upc: string): Promise<UserProductInfo | null> {
+  const { data: { user } } = await supabase.auth.getUser()
+// ====================================================================
+// USER PRODUCT INFO (UPC -> Preferred Name/Category/Location)
+// ====================================================================
+
+/**
+ * Get user's saved product info for a UPC code.
+ * Returns null if the user hasn't scanned this UPC before.
+ */
+export async function getUserProductInfo(upc: string): Promise<UserProductInfo | null> {
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) {
+    console.error('User not authenticated')
+    return null
+  }
+
+  const { data, error } = await supabase
+    .from('user_product_info')
+    .select('*')
+    .eq('user_id', user.id)
+    .eq('upc', upc)
+    .maybeSingle()
+
+  if (error) {
+    console.error('Error fetching user product info:', error)
+    return null
+  }
+
+  return data
+}
+
+/**
+ * Save user's preferred product info for a UPC code.
+ * Updates existing record or creates new one.
+ */
+export async function saveUserProductInfo(
+  upc: string,
+  preferredName: string,
+  preferredCategory: string | null = null,
+  preferredLocation: string | null = null
+): Promise<UserProductInfo | null> {
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) {
+    console.error('User not authenticated')
+    return null
+  }
+
+  const { data, error } = await supabase
+    .from('user_product_info')
+    .upsert([
+      {
+        user_id: user.id,
+        upc,
+        preferred_name: preferredName,
+        preferred_category: preferredCategory,
+        preferred_location: preferredLocation,
+      },
+    ], {
+      onConflict: 'user_id,upc'
+    })
+    .select()
+    .single()
+
+  if (error) {
+    console.error('Error saving user product info:', error)
+    return null
+  }
+
+  return data
+}
+
+  if (!user) {
+    console.error('User not authenticated')
+    return null
+  }
+
+  const { data, error } = await supabase
+    .from('user_product_info')
+    .select('*')
+    .eq('user_id', user.id)
+    .eq('upc', upc)
+    .maybeSingle()
+
+  if (error) {
+    console.error('Error fetching user product info:', error)
+    return null
+  }
+
+  return data
+}
+
+/**
+ * Save user's preferred product info for a UPC code.
+ * Updates existing record or creates new one.
+ */
+export async function saveUserProductInfo(
+  upc: string,
+  preferredName: string,
+  preferredCategory: string | null = null,
+  preferredLocation: string | null = null
+): Promise<UserProductInfo | null> {
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) {
+    console.error('User not authenticated')
+    return null
+  }
+
+  const { data, error } = await supabase
+    .from('user_product_info')
+    .upsert([{
+      user_id: user.id,
+      upc,
+      preferred_name: preferredName,
+      preferred_category: preferredCategory,
+      preferred_location: preferredLocation,
+    }], {
+      onConflict: 'user_id,upc'
+    })
+    .select()
+    .single()
+
+  if (error) {
+    console.error('Error saving user product info:', error)
+    return null
+  }
+
+  return data
+}
+
+// ====================================================================
 // INVENTORY ITEMS
 // ====================================================================
 
@@ -123,6 +283,8 @@ export async function getInventoryItemByUPC(upc: string): Promise<InventoryItem 
     .select('*')
     .eq('upc', upc)
     .is('scan_out_date', null)
+    .order('scan_in_date', { ascending: true })
+    .limit(1)
     .maybeSingle()
 
   if (error) {
@@ -146,41 +308,44 @@ export async function scanInItem(
     return null
   }
 
-  // Create inventory item
-  const { data: item, error: itemError } = await supabase
+  const units = Math.max(1, quantity)
+  const now = new Date().toISOString()
+
+  const payload = Array.from({ length: units }).map(() => ({
+    user_id: user.id,
+    name,
+    upc,
+    category,
+    location,
+    quantity: 1, // enforce per-item instance
+    scan_in_date: now,
+  }))
+
+  const { data: items, error: itemError } = await supabase
     .from('inventory_items')
-    .insert([{
-      user_id: user.id,
-      name,
-      upc,
-      category,
-      location,
-      quantity,
-      scan_in_date: new Date().toISOString()
-    }])
+    .insert(payload)
     .select()
-    .single()
 
   if (itemError) {
     console.error('Error scanning in item:', itemError)
     return null
   }
 
-  // Log the scan in
-  await supabase
-    .from('inventory_history')
-    .insert([{
-      user_id: user.id,
-      upc,
-      item_name: name,
-      category,
-      location,
-      action: 'scan_in',
-      quantity,
-      scan_date: new Date().toISOString()
-    }])
+  // Log the scan in for each unit
+  const historyRows = payload.map(() => ({
+    user_id: user.id,
+    upc,
+    item_name: name,
+    category,
+    location,
+    action: 'scan_in',
+    quantity: 1,
+    scan_date: now,
+  }))
 
-  return item
+  await supabase.from('inventory_history').insert(historyRows)
+
+  return items?.[0] || null
 }
 
 export async function scanOutItem(
@@ -229,13 +394,13 @@ export async function scanOutItem(
       category: item.category,
       location: item.location,
       action: 'scan_out',
-      quantity: item.quantity,
+      quantity: 1,
       scan_date: new Date().toISOString()
     }])
 
   // If adding to shopping list, add it
   if (addToShoppingList) {
-    await addToShoppingListDefinite(item.name, item.upc, item.category, item.quantity)
+    await addToShoppingListDefinite(item.name, item.upc, item.category, 1)
   }
 
   return true
@@ -243,11 +408,11 @@ export async function scanOutItem(
 
 export async function updateInventoryItem(
   id: string,
-  updates: Partial<Pick<InventoryItem, 'name' | 'category' | 'location' | 'quantity' | 'notes'>>
+  updates: Partial<Pick<InventoryItem, 'name' | 'category' | 'location' | 'notes'>
 ): Promise<InventoryItem | null> {
   const { data, error } = await supabase
     .from('inventory_items')
-    .update({ ...updates, updated_at: new Date().toISOString() })
+    .update({ ...updates, updated_at: new Date().toISOString(), quantity: 1 })
     .eq('id', id)
     .select()
     .single()
@@ -471,8 +636,11 @@ export async function generateShoppingPredictions(): Promise<void> {
     const lastScanOut = scanOuts[scanOuts.length - 1]
     const daysSinceLastScanOut = (Date.now() - new Date(lastScanOut.scan_date).getTime()) / (1000 * 60 * 60 * 24)
 
-    // If we're approaching the average repurchase time, add to suggested list
-    if (daysSinceLastScanOut >= avgDays * 0.7) { // 70% threshold
+    // Suggest a few days BEFORE expected depletion
+    const leadWindow = Math.max(2, Math.round(avgDays * 0.4)) // 40% of cycle or at least 2 days
+    const daysUntilExpected = avgDays - daysSinceLastScanOut
+
+    if (daysUntilExpected <= leadWindow) {
       const confidence = Math.min(1, scanIns.length / 5) // More data = higher confidence
 
       // Check if already in shopping list

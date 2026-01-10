@@ -73,16 +73,15 @@ export default function InventoryPage() {
       name: editingItem.name,
       category: editingItem.category || null,
       location: editingItem.location || null,
-      quantity: editingItem.quantity,
       notes: editingItem.notes || null
     })
 
     if (result) {
-      toast.success('Item updated!')
+      toast.success('Item updated!', { duration: 3000 })
       setEditingItem(null)
       await loadData()
     } else {
-      toast.error('Failed to update item')
+      toast.error('Failed to update item', { duration: 5000 })
     }
   }
 
@@ -92,10 +91,10 @@ export default function InventoryPage() {
     const success = await deleteInventoryItem(id)
 
     if (success) {
-      toast.success('Item deleted!')
+      toast.success('Item deleted!', { duration: 3000 })
       await loadData()
     } else {
-      toast.error('Failed to delete item')
+      toast.error('Failed to delete item', { duration: 5000 })
     }
   }
 
@@ -123,7 +122,7 @@ export default function InventoryPage() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 pb-20">
-      <Toaster position="top-center" />
+      <Toaster position="bottom-right" />
       
       {/* Header */}
       <div className="bg-white border-b border-gray-200 sticky top-0 z-10">
@@ -131,20 +130,7 @@ export default function InventoryPage() {
           <div className="flex items-center gap-4 mb-4">
             <Link href="/home" className="p-2 hover:bg-gray-100 rounded-lg transition-colors text-gray-600 hover:text-gray-900" title="Back to home">
               <ArrowLeft className="w-6 h-6" />
-            </Link>
-            <h1 className="text-xl font-bold text-gray-900 flex-1">Inventory</h1>
-          </div>
-
-          {/* Search */}
-          <div className="space-y-2">
-            <div className="relative">
-              <Search className="w-5 h-5 absolute left-3 top-2.5 text-gray-400" />
-              <input
-                type="text"
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                placeholder="Search items..."
-                className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all"
+                className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all text-gray-900 placeholder:text-gray-500"
               />
             </div>
 
@@ -153,7 +139,7 @@ export default function InventoryPage() {
               <select
                 value={locationFilter}
                 onChange={(e) => setLocationFilter(e.target.value)}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all text-sm"
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all text-sm text-gray-900"
               >
                 <option value="">All locations</option>
                 {locations.map((loc) => (

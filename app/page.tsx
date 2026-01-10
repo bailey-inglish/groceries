@@ -57,7 +57,7 @@ export default function LoginPage() {
     e.preventDefault()
     
     if (!email) {
-      toast.error('Please enter your email')
+      toast.error('Please enter your email', { duration: 5000 })
       return
     }
 
@@ -80,9 +80,9 @@ export default function LoginPage() {
           if (error.message?.includes('only request this after')) {
             const match = error.message.match(/(\d+)\s+seconds/)
             const seconds = match ? match[1] : '60'
-            toast.error(`Please wait ${seconds} seconds before requesting another code.`)
+            toast.error(`Please wait ${seconds} seconds before requesting another code.`, { duration: 5000 })
           } else {
-            toast.error(error.message || 'Failed to send verification code')
+            toast.error(error.message || 'Failed to send verification code', { duration: 5000 })
           }
           setLoading(false)
           return
@@ -90,7 +90,7 @@ export default function LoginPage() {
 
         setOtpSent(true)
         setSentToEmail(email)
-        toast.success('Check your email for a 6-digit code!')
+        toast.success('Check your email for a 6-digit code!', { duration: 3000 })
       } else {
         // For desktop: send magic link
         const redirectUrl = 'https://easygroceries.vercel.app/auth-callback'
@@ -105,9 +105,9 @@ export default function LoginPage() {
           if (error.message?.includes('only request this after')) {
             const match = error.message.match(/(\d+)\s+seconds/)
             const seconds = match ? match[1] : '60'
-            toast.error(`Please wait ${seconds} seconds before requesting another link.`)
+            toast.error(`Please wait ${seconds} seconds before requesting another link.`, { duration: 5000 })
           } else {
-            toast.error(error.message || 'Failed to send login link')
+            toast.error(error.message || 'Failed to send login link', { duration: 5000 })
           }
           setLoading(false)
           return
@@ -115,10 +115,10 @@ export default function LoginPage() {
 
         setMagicLinkSent(true)
         setSentToEmail(email)
-        toast.success('Check your email for the magic link!')
+        toast.success('Check your email for the magic link!', { duration: 3000 })
       }
     } catch (err: any) {
-      toast.error('Unexpected error occurred')
+      toast.error('Unexpected error occurred', { duration: 5000 })
     } finally {
       setLoading(false)
     }
@@ -137,15 +137,15 @@ export default function LoginPage() {
       })
 
       if (error) {
-        toast.error('Invalid or expired code. Try again.')
+        toast.error('Invalid or expired code. Try again.', { duration: 5000 })
         setVerifyingOtp(false)
         return
       }
 
-      toast.success('Signed in successfully!')
+      toast.success('Signed in successfully!', { duration: 3000 })
       router.replace('/home')
     } catch (err: any) {
-      toast.error('Verification failed')
+      toast.error('Verification failed', { duration: 5000 })
       setVerifyingOtp(false)
     }
   }
@@ -159,7 +159,7 @@ export default function LoginPage() {
     if (outcome === 'accepted') {
       setShowInstallPrompt(false)
       setIsInstalled(true)
-      toast.success('App installed successfully!')
+      toast.success('App installed successfully!', { duration: 3000 })
     }
     
     setDeferredPrompt(null)
@@ -171,7 +171,7 @@ export default function LoginPage() {
   if (!isMobile) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100 p-4">
-        <Toaster position="top-center" />
+        <Toaster position="bottom-right" />
         <div className="bg-white rounded-2xl shadow-xl p-8 max-w-md w-full text-center">
           <div className="flex items-center justify-center w-16 h-16 bg-blue-100 rounded-full mx-auto mb-6">
             <ShoppingCart className="w-8 h-8 text-blue-600" />
@@ -212,7 +212,7 @@ export default function LoginPage() {
   if (!isInstalled) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex flex-col">
-        <Toaster position="top-center" />
+        <Toaster position="bottom-right" />
         
         {/* Top spacing */}
         <div className="flex-1" />
@@ -294,7 +294,7 @@ export default function LoginPage() {
   if (otpSent) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex flex-col">
-        <Toaster position="top-center" />
+        <Toaster position="bottom-right" />
         
         {/* Top spacing */}
         <div className="flex-1" />
@@ -321,7 +321,7 @@ export default function LoginPage() {
                 value={otpCode}
                 onChange={(e) => setOtpCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
                 placeholder="000000"
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg text-center text-3xl font-mono tracking-[0.5em] focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
+                className="w-full px-4 py-3 border border-gray-300 rounded-lg text-center text-3xl font-mono tracking-[0.5em] focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none text-gray-900 placeholder:text-gray-400"
                 maxLength={6}
                 autoFocus
               />
@@ -369,7 +369,7 @@ export default function LoginPage() {
   if (magicLinkSent) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex flex-col">
-        <Toaster position="top-center" />
+        <Toaster position="bottom-right" />
         
         {/* Top spacing */}
         <div className="flex-1" />
@@ -416,7 +416,7 @@ export default function LoginPage() {
   // Mobile - Login form
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex flex-col">
-      <Toaster position="top-center" />
+      <Toaster position="bottom-right" />
       
       {/* Top spacing */}
       <div className="flex-1" />
@@ -449,7 +449,7 @@ export default function LoginPage() {
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="you@example.com"
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all"
+                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all text-gray-900 placeholder:text-gray-500"
                 required
               />
             </div>

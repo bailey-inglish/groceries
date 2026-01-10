@@ -37,16 +37,16 @@ export default function ScanOutPage() {
     
     if (item) {
       setFoundItem(item)
-      toast.success(`Found: ${item.name}`)
+      toast.success(`Found: ${item.name}`, { duration: 3000 })
     } else {
-      toast.error('Item not found in inventory')
+      toast.error('Item not found in inventory', { duration: 5000 })
       setFoundItem(null)
     }
   }
 
   const handleScanOut = async () => {
     if (!foundItem) {
-      toast.error('No item selected')
+      toast.error('No item selected', { duration: 5000 })
       return
     }
 
@@ -60,7 +60,7 @@ export default function ScanOutPage() {
       const message = addToList 
         ? `${foundItem.name} marked as used and added to shopping list!`
         : `${foundItem.name} marked as used!`
-      toast.success(message)
+      toast.success(message, { duration: 3000 })
       
       // Reset
       setScannedBarcode('')
@@ -68,13 +68,13 @@ export default function ScanOutPage() {
       setAddToList(true)
       setShowScanner(true)
     } else {
-      toast.error('Failed to scan out item')
+      toast.error('Failed to scan out item', { duration: 5000 })
     }
   }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100">
-      <Toaster position="top-center" />
+      <Toaster position="bottom-right" />
       
       {/* Header */}
       <div className="bg-white border-b border-gray-200">
@@ -93,7 +93,7 @@ export default function ScanOutPage() {
             <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4 mb-6">
               <BarcodeScanner
                 onScan={handleBarcodeScanned}
-                onError={(error) => toast.error(error)}
+                onError={(error) => toast.error(error, { duration: 5000 })}
               />
             </div>
 
