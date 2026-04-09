@@ -3,7 +3,7 @@ import { NextResponse } from "next/server"
 
 export default auth((req) => {
   const { nextUrl } = req
-  const isLoggedIn = !!req.auth
+  const isLoggedIn = !!req.auth?.user
 
   const isAuthPage =
     nextUrl.pathname.startsWith("/auth/signin") ||
@@ -14,9 +14,7 @@ export default auth((req) => {
   if (isApiAuthRoute) return NextResponse.next()
 
   if (isAuthPage) {
-    if (isLoggedIn) {
-      return NextResponse.redirect(new URL("/", nextUrl))
-    }
+    // Let auth pages render to avoid redirect loops with stale cookies.
     return NextResponse.next()
   }
 
