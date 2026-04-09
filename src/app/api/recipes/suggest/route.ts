@@ -28,9 +28,15 @@ export async function POST(req: NextRequest) {
     select: { openAiKey: true, dietaryRestrictions: true, householdSize: true },
   })
 
-  if (!user?.openAiKey) {
+  if (!user) {
+    return NextResponse.json({ error: "User not found" }, { status: 404 })
+  }
+
+  const apiKey = user.openAiKey || process.env.GEMINI_API_KEY
+
+  if (!apiKey) {
     return NextResponse.json(
-      { error: "OpenAI API key not configured. Please add it in Settings." },
+      { error: "Gemini API key not configured. Add one in Settings or set GEMINI_API_KEY in environment variables." },
       { status: 400 }
     )
   }
@@ -44,7 +50,7 @@ export async function POST(req: NextRequest) {
   const dietaryRestrictions: string[] = JSON.parse(user.dietaryRestrictions || "[]")
 
   const suggestions = await generateRecipeSuggestions({
-    apiKey: user.openAiKey,
+    apiKey,
     inventoryItems: items.map((item) => ({
       name: item.name,
       quantity: item.quantity,

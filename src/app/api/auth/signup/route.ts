@@ -11,6 +11,13 @@ const signUpSchema = z.object({
 
 export async function POST(req: NextRequest) {
   try {
+    if (!process.env.DATABASE_URL) {
+      return NextResponse.json(
+        { error: "Server database is not configured. Set DATABASE_URL in Vercel project settings." },
+        { status: 503 }
+      )
+    }
+
     const body = await req.json()
     const parsed = signUpSchema.safeParse(body)
 
@@ -38,6 +45,6 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ user }, { status: 201 })
   } catch (error) {
     console.error("Signup error:", error)
-    return NextResponse.json({ error: "Internal server error" }, { status: 500 })
+    return NextResponse.json({ error: "Unable to create account right now" }, { status: 503 })
   }
 }

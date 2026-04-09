@@ -10,6 +10,10 @@ const signInSchema = z.object({
 })
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
+  secret:
+    process.env.NEXTAUTH_SECRET ??
+    process.env.AUTH_SECRET ??
+    "easygroceries-change-this-secret-in-production",
   providers: [
     Credentials({
       credentials: {
@@ -21,16 +25,21 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         if (!parsed.success) return null
 
         const { email, password } = parsed.data
-        const user = await prisma.user.findUnique({ where: { email } })
-        if (!user) return null
+        try {
+          const user = await prisma.user.findUnique({ where: { email } })
+          if (!user) return null
 
-        const valid = await bcrypt.compare(password, user.passwordHash)
-        if (!valid) return null
+          const valid = await bcrypt.compare(password, user.passwordHash)
+          if (!valid) return null
 
-        return {
-          id: user.id,
-          email: user.email,
-          name: user.name,
+          return {
+            id: user.id,
+            email: user.email,
+            name: user.name,
+          }
+        } catch (error) {
+          console.error("Authorize error:", error)
+          return null
         }
       },
     }),

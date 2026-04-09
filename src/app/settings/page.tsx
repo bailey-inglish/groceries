@@ -229,7 +229,7 @@ export default function SettingsPage() {
             </CardContent>
           </Card>
 
-          {/* OpenAI */}
+          {/* AI Provider Key */}
           <Card className="border-0 shadow-sm">
             <CardHeader className="pb-2 pt-4 px-4">
               <CardTitle className="text-base flex items-center gap-2">
@@ -239,15 +239,15 @@ export default function SettingsPage() {
             </CardHeader>
             <CardContent className="px-4 pb-4 space-y-3">
               <p className="text-sm text-muted-foreground">
-                Add your OpenAI API key to enable AI-powered recipe suggestions.
+                Add your Gemini API key to enable AI-powered recipe suggestions.
               </p>
               <div className="space-y-1.5">
-                <Label>OpenAI API Key</Label>
+                <Label>Gemini API Key</Label>
                 <Input
                   type="password"
                   value={form.openAiKey}
                   onChange={(e) => setForm({ ...form, openAiKey: e.target.value })}
-                  placeholder={settings?.hasOpenAiKey ? "••••••••••••• (already set)" : "sk-..."}
+                  placeholder={settings?.hasOpenAiKey ? "••••••••••••• (already set)" : "AIza..."}
                   className="h-11 font-mono"
                 />
               </div>
