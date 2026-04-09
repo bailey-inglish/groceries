@@ -2,15 +2,15 @@
 
 import Link from "next/link"
 import { usePathname } from "next/navigation"
-import { LayoutDashboard, Package, ScanLine, Calendar, ShoppingCart } from "lucide-react"
+import { Package, ScanLine, ChefHat, ShoppingCart, BookOpen } from "lucide-react"
 import { cn } from "@/lib/utils"
 
 const navItems = [
-  { href: "/", icon: LayoutDashboard, label: "Home" },
-  { href: "/inventory", icon: Package, label: "Pantry" },
+  { href: "/", icon: Package, label: "Inventory" },
   { href: "/scan", icon: ScanLine, label: "Scan", highlight: true },
-  { href: "/meal-plan", icon: Calendar, label: "Plan" },
+  { href: "/meal", icon: ChefHat, label: "Meal" },
   { href: "/shopping-list", icon: ShoppingCart, label: "List" },
+  { href: "/recipes", icon: BookOpen, label: "Recipes" },
 ]
 
 export function BottomNav() {
