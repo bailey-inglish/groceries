@@ -38,7 +38,10 @@ export async function calculatePredictions(
 
   return items.map((item) => {
     const scanOuts = item.stockEvents.filter(
-      (e) => e.eventType === "SCAN_OUT" || e.eventType === "MANUAL_ADJUST"
+      (e) =>
+        e.eventType === "SCAN_OUT" ||
+        // Only include manual adjustments that reduced quantity (consumption)
+        (e.eventType === "MANUAL_ADJUST" && e.quantityChange < 0)
     )
 
     if (scanOuts.length < 2) {

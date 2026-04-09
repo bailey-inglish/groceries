@@ -75,6 +75,8 @@ export async function POST(req: NextRequest) {
 
     for (const loc of customLocations) {
       const slug = loc.name.toUpperCase().replace(/\s+/g, "_").replace(/[^A-Z0-9_]/g, "")
+      // Skip if slug is empty (all-special-char name) or a duplicate would occur
+      if (!slug) continue
       await prisma.userLocation.upsert({
         where: { userId_slug: { userId: session.user.id, slug } },
         create: {

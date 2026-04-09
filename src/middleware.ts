@@ -28,8 +28,8 @@ export default auth((req) => {
   // Gate non-onboarding pages behind onboarding completion.
   // onboardingCompleted is stored in the JWT token (set in auth.ts).
   if (!isOnboardingPage) {
-    const onboardingCompleted = (req.auth as { user?: { onboardingCompleted?: boolean } })?.user?.onboardingCompleted
-    if (onboardingCompleted === false) {
+    const sessionUser = req.auth?.user as { id?: string; onboardingCompleted?: boolean } | undefined
+    if (sessionUser?.onboardingCompleted === false) {
       return NextResponse.redirect(new URL("/onboarding", nextUrl))
     }
   }

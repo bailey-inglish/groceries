@@ -38,6 +38,10 @@ export async function POST(req: NextRequest) {
   // Build slug from name: uppercase, spaces → underscores, strip non-alphanum
   const slug = name.toUpperCase().replace(/\s+/g, "_").replace(/[^A-Z0-9_]/g, "")
 
+  if (!slug) {
+    return NextResponse.json({ error: "Location name must contain at least one alphanumeric character" }, { status: 400 })
+  }
+
   const existing = await prisma.userLocation.findUnique({
     where: { userId_slug: { userId: session.user.id, slug } },
   })

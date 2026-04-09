@@ -29,6 +29,8 @@ import {
   Apple,
 } from "lucide-react"
 
+// ─── Types ─────────────────────────────────────────────────────────────────
+
 interface Recipe {
   id: string
   title: string
@@ -54,6 +56,17 @@ interface MealPlan {
   entries: MealPlanEntry[]
 }
 
+interface MealEntryData {
+  date: string
+  mealType: string
+  recipeId?: string
+  customMealName?: string
+  notes?: string
+  status?: string
+}
+
+// ─── Constants ──────────────────────────────────────────────────────────────
+
 const MEAL_TYPES = [
   { value: "BREAKFAST", label: "Breakfast", icon: Coffee, color: "bg-yellow-100 text-yellow-800" },
   { value: "LUNCH", label: "Lunch", icon: Sun, color: "bg-blue-100 text-blue-800" },
@@ -69,6 +82,8 @@ const STATUS_COLORS: Record<string, string> = {
 
 const DAY_NAMES_FULL = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"]
 
+// ─── Helpers ────────────────────────────────────────────────────────────────
+
 function addDays(date: Date, days: number): Date {
   const d = new Date(date)
   d.setDate(d.getDate() + days)
@@ -78,6 +93,8 @@ function addDays(date: Date, days: number): Date {
 function formatDate(date: Date): string {
   return date.toISOString().split("T")[0]
 }
+
+// ─── Sub-components ─────────────────────────────────────────────────────────
 
 function MealSlot({
   entry,
@@ -139,14 +156,7 @@ function EntrySheet({
   date: Date
   mealType: string
   recipes: Recipe[]
-  onSave: (data: {
-    date: string
-    mealType: string
-    recipeId?: string
-    customMealName?: string
-    notes?: string
-    status?: string
-  }) => Promise<void>
+  onSave: (data: MealEntryData) => Promise<void>
   onDelete?: () => Promise<void>
 }) {
   const [selectedRecipeId, setSelectedRecipeId] = useState("")
@@ -201,7 +211,6 @@ function EntrySheet({
         </SheetHeader>
 
         <div className="px-4 space-y-4 pb-2">
-          {/* Mode toggle */}
           <div className="flex gap-2 bg-secondary rounded-lg p-1">
             <button
               onClick={() => setInputMode("recipe")}
@@ -291,7 +300,10 @@ function EntrySheet({
             <Button
               variant="ghost"
               className="text-destructive hover:text-destructive hover:bg-destructive/10"
-              onClick={async () => { await onDelete(); onClose() }}
+              onClick={async () => {
+                await onDelete()
+                onClose()
+              }}
             >
               <X className="w-4 h-4 mr-2" />
               Remove
@@ -309,6 +321,8 @@ function EntrySheet({
     </Sheet>
   )
 }
+
+// ─── Page ───────────────────────────────────────────────────────────────────
 
 export default function MealPlanPage() {
   const [currentWeekDate, setCurrentWeekDate] = useState(new Date())
@@ -357,7 +371,7 @@ export default function MealPlanPage() {
     setSheetOpen(true)
   }
 
-  async function handleSaveEntry(data: Parameters<typeof fetch>[1] extends { body?: string } ? Parameters<typeof fetch>[1] : never) {
+  async function handleSaveEntry(data: MealEntryData) {
     const res = await fetch("/api/meal-plan", {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
@@ -376,7 +390,6 @@ export default function MealPlanPage() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Header */}
       <div className="bg-white border-b sticky top-0 z-10">
         <div className="max-w-lg mx-auto px-4 py-4">
           <div className="flex items-center justify-between">
@@ -386,7 +399,6 @@ export default function MealPlanPage() {
             </h1>
           </div>
 
-          {/* Week navigation */}
           <div className="flex items-center justify-between mt-3">
             <button
               onClick={() => setCurrentWeekDate((d) => addDays(d, -7))}
@@ -411,7 +423,6 @@ export default function MealPlanPage() {
         </div>
       </div>
 
-      {/* Calendar grid */}
       <div className="max-w-lg mx-auto px-4 py-4 space-y-3">
         {loading ? (
           Array.from({ length: 7 }).map((_, i) => (
@@ -464,7 +475,7 @@ export default function MealPlanPage() {
         date={sheetDate}
         mealType={sheetMealType}
         recipes={recipes}
-        onSave={handleSaveEntry as Parameters<typeof EntrySheet>[0]["onSave"]}
+        onSave={handleSaveEntry}
         onDelete={sheetEntry ? handleDeleteEntry : undefined}
       />
     </div>
