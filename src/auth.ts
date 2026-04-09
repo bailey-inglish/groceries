@@ -36,6 +36,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
             id: user.id,
             email: user.email,
             name: user.name,
+            onboardingCompleted: user.onboardingCompleted,
           }
         } catch (error) {
           console.error("Authorize error:", error)
@@ -49,17 +50,25 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     signIn: "/auth/signin",
   },
   callbacks: {
-    async jwt({ token, user }) {
+    async jwt({ token, user, trigger, session }) {
       if (user) {
         token.id = user.id ?? token.sub
+        token.onboardingCompleted = (user as { onboardingCompleted?: boolean }).onboardingCompleted ?? false
+      }
+      // Allow client-side session.update() to push onboardingCompleted into the token
+      if (trigger === "update" && typeof session?.onboardingCompleted === "boolean") {
+        token.onboardingCompleted = session.onboardingCompleted
       }
       return token
     },
     async session({ session, token }) {
       if (token && session.user) {
         session.user.id = (token.id ?? token.sub) as string
+        ;(session.user as { onboardingCompleted?: boolean }).onboardingCompleted =
+          (token.onboardingCompleted as boolean | undefined) ?? false
       }
       return session
     },
   },
 })
+

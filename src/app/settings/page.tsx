@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react"
 import { signOut } from "next-auth/react"
+import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -17,6 +18,7 @@ import {
   Loader2,
   CheckCircle,
   Users,
+  ChevronLeft,
 } from "lucide-react"
 
 const DIETARY_OPTIONS = [
@@ -107,7 +109,8 @@ export default function SettingsPage() {
     return (
       <div className="min-h-screen bg-gray-50">
         <div className="bg-white border-b">
-          <div className="max-w-lg mx-auto px-4 py-4">
+          <div className="max-w-lg mx-auto px-4 py-4 flex items-center gap-3">
+            <Skeleton className="h-9 w-9 rounded-lg" />
             <Skeleton className="h-7 w-24" />
           </div>
         </div>
@@ -129,7 +132,12 @@ export default function SettingsPage() {
   return (
     <div className="min-h-screen bg-gray-50">
       <div className="bg-white border-b sticky top-0 z-10">
-        <div className="max-w-lg mx-auto px-4 py-4">
+        <div className="max-w-lg mx-auto px-4 py-4 flex items-center gap-3">
+          <Link href="/">
+            <button className="flex items-center justify-center w-9 h-9 rounded-lg bg-secondary hover:bg-secondary/80 transition-colors" aria-label="Back">
+              <ChevronLeft className="w-5 h-5" />
+            </button>
+          </Link>
           <h1 className="text-lg font-bold">Settings</h1>
         </div>
       </div>

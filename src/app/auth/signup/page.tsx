@@ -1,6 +1,7 @@
 "use client"
 
 import { useState } from "react"
+import { signIn } from "next-auth/react"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
@@ -36,7 +37,20 @@ export default function SignUpPage() {
         return
       }
 
-      router.push("/auth/signin?message=Account created, please sign in")
+      // Auto sign-in immediately after account creation
+      const result = await signIn("credentials", {
+        email,
+        password,
+        redirect: false,
+      })
+
+      if (result?.error) {
+        // Account was created but sign-in failed — fall back to sign-in page
+        router.push("/auth/signin?message=Account created, please sign in")
+      } else {
+        router.push("/onboarding")
+        router.refresh()
+      }
     } catch {
       setError("Something went wrong. Please try again.")
     } finally {

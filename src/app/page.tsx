@@ -100,7 +100,7 @@ export default async function DashboardPage() {
         </div>
 
         <Link href="/scan">
-          <Card className="border-0 shadow-sm bg-primary text-primary-foreground cursor-pointer hover:bg-primary/90 transition-colors">
+          <Card className="border-0 shadow-sm bg-primary text-primary-foreground cursor-pointer hover:bg-primary/90 transition-colors mt-2">
             <CardContent className="p-4 flex items-center gap-4">
               <div className="flex items-center justify-center w-12 h-12 bg-primary-foreground/20 rounded-xl">
                 <ScanLine className="w-6 h-6" />

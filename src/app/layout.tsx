@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import { BottomNav } from "@/components/bottom-nav";
+import { Providers } from "@/components/providers";
 import { auth } from "@/auth";
 
 export const metadata: Metadata = {
@@ -35,12 +36,15 @@ export default async function RootLayout({
         <link rel="apple-touch-icon" href="/icons/icon-192.png" />
       </head>
       <body className="antialiased bg-background min-h-screen">
-        <main className={session ? "pb-20" : ""}>
-          {children}
-        </main>
-        {session && <BottomNav />}
+        <Providers>
+          <main className={session ? "pb-20" : ""}>
+            {children}
+          </main>
+          {session && <BottomNav />}
+        </Providers>
       </body>
     </html>
   );
 }
+
 
