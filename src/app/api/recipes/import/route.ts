@@ -145,4 +145,3 @@ ${truncatedHtml}`,
 
   return NextResponse.json({ recipe }, { status: 201 })
 }
-

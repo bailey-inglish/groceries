@@ -232,4 +232,3 @@ export default function BarcodeScanner({ onScan, onError }: BarcodeScannerProps)
   }
   return <LegacyScanner onScan={onScan} onError={onError} />
 }
-

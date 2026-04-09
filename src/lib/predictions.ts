@@ -121,4 +121,3 @@ export async function getExpiringItems(userId: string, daysThreshold = 7) {
     orderBy: { expirationDate: "asc" },
   })
 }
-
