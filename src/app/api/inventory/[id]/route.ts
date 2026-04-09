@@ -8,11 +8,14 @@ const updateItemSchema = z.object({
   brand: z.string().optional(),
   quantity: z.number().nonnegative().optional(),
   unit: z.string().optional(),
-  location: z.enum(["FRIDGE", "FREEZER", "PANTRY", "SPICE_RACK", "COUNTER", "CELLAR", "OTHER"]).optional(),
+  location: z.string().optional(),
   category: z.string().optional(),
   expirationDate: z.string().nullable().optional(),
   notes: z.string().optional(),
   imageUrl: z.string().optional(),
+  packageSize: z.number().positive().optional(),
+  packageUnit: z.string().optional(),
+  isOpened: z.boolean().optional(),
 })
 
 export async function GET(

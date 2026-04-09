@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { auth } from "@/auth"
 import { prisma } from "@/lib/prisma"
 import { z } from "zod"
-import { seedDefaultLocations, DEFAULT_LOCATIONS } from "@/app/api/locations/route"
+import { seedDefaultLocations, DEFAULT_LOCATIONS } from "@/lib/locations"
 
 const onboardingSchema = z.object({
   name: z.string().optional(),

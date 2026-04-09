@@ -12,18 +12,10 @@ import {
   ScanLine,
   TrendingDown,
   Clock,
+  Calendar,
 } from "lucide-react"
 import { getExpiringItems, getItemsRunningLow } from "@/lib/predictions"
-
-const locationColors: Record<string, string> = {
-  FRIDGE: "bg-blue-100 text-blue-800",
-  FREEZER: "bg-cyan-100 text-cyan-800",
-  PANTRY: "bg-amber-100 text-amber-800",
-  SPICE_RACK: "bg-orange-100 text-orange-800",
-  COUNTER: "bg-purple-100 text-purple-800",
-  CELLAR: "bg-stone-100 text-stone-800",
-  OTHER: "bg-gray-100 text-gray-800",
-}
+import { seedDefaultLocations } from "@/lib/locations"
 
 export default async function DashboardPage() {
   const session = await auth()
@@ -31,7 +23,10 @@ export default async function DashboardPage() {
 
   const userId = session.user.id
 
-  const [locationCounts, recentActivity, expiringItems, lowItems, totalItems] = await Promise.all([
+  // Seed default locations for new users if needed
+  await seedDefaultLocations(userId)
+
+  const [locationCounts, recentActivity, expiringItems, lowItems, totalItems, userLocations, nudgeItems] = await Promise.all([
     prisma.inventoryItem.groupBy({
       by: ["location"],
       where: { userId },
@@ -46,7 +41,35 @@ export default async function DashboardPage() {
     getExpiringItems(userId, 7),
     getItemsRunningLow(userId),
     prisma.inventoryItem.count({ where: { userId } }),
+    prisma.userLocation.findMany({
+      where: { userId, isVisible: true },
+      orderBy: [{ sortOrder: "asc" }],
+    }),
+    // Quantity nudge items: packageSize known, quantity < 10% of package
+    prisma.inventoryItem.findMany({
+      where: {
+        userId,
+        packageSize: { not: null },
+      },
+      select: { id: true, name: true, quantity: true, unit: true, packageSize: true, packageUnit: true, updatedAt: true },
+    }).then((items) =>
+      items.filter(
+        (i) =>
+          i.packageSize! > 0 &&
+          i.quantity / i.packageSize! < 0.1 &&
+          // Only nudge if updated in the last 72 hours (avoid stale items)
+          Date.now() - new Date(i.updatedAt).getTime() < 72 * 60 * 60 * 1000
+      ).slice(0, 3)
+    ),
   ])
+
+  // Build a slug → color map from user locations
+  const locationColorMap: Record<string, string> = Object.fromEntries(
+    userLocations.map((l) => [l.slug, l.color])
+  )
+  const locationLabelMap: Record<string, string> = Object.fromEntries(
+    userLocations.map((l) => [l.slug, l.name])
+  )
 
   const userInitials = session.user.name
     ? session.user.name.split(" ").map((n: string) => n[0]).join("").toUpperCase().slice(0, 2)
@@ -113,6 +136,44 @@ export default async function DashboardPage() {
           </Card>
         </Link>
 
+        <Link href="/meal-plan">
+          <Card className="border-0 shadow-sm bg-violet-600 text-white cursor-pointer hover:bg-violet-700 transition-colors">
+            <CardContent className="p-4 flex items-center gap-4">
+              <div className="flex items-center justify-center w-12 h-12 bg-white/20 rounded-xl">
+                <Calendar className="w-6 h-6" />
+              </div>
+              <div>
+                <div className="font-semibold text-base">Meal Planner</div>
+                <div className="text-sm opacity-80">Plan your week&apos;s meals</div>
+              </div>
+            </CardContent>
+          </Card>
+        </Link>
+
+        {nudgeItems.length > 0 && (
+          <Card className="border-0 shadow-sm border-l-4 border-l-amber-400 bg-amber-50">
+            <CardHeader className="pb-2 pt-4 px-4">
+              <CardTitle className="text-sm flex items-center gap-2 text-amber-800">
+                <TrendingDown className="w-4 h-4" />
+                Almost Empty — confirm quantities
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="px-4 pb-4 space-y-1">
+              {nudgeItems.map((item) => {
+                const pct = Math.round((item.quantity / item.packageSize!) * 100)
+                return (
+                  <Link href="/inventory" key={item.id}>
+                    <div className="flex items-center justify-between py-2 border-b border-amber-200 last:border-0">
+                      <span className="text-sm font-medium text-amber-900 truncate">{item.name}</span>
+                      <Badge className="bg-amber-200 text-amber-900 text-xs shrink-0">{pct}% left</Badge>
+                    </div>
+                  </Link>
+                )
+              })}
+            </CardContent>
+          </Card>
+        )}
+
         {(expiringItems.length > 0 || lowItems.length > 0) && (
           <Card className="border-0 shadow-sm">
             <CardHeader className="pb-2 pt-4 px-4">
@@ -170,11 +231,11 @@ export default async function DashboardPage() {
               <div className="grid grid-cols-2 gap-2">
                 {locationCounts.map((loc) => (
                   <Link href={`/inventory?location=${loc.location}`} key={loc.location}>
-                    <div className={`flex items-center gap-2 p-3 rounded-lg ${locationColors[loc.location] || "bg-gray-100"} cursor-pointer hover:opacity-80 transition-opacity`}>
+                    <div className={`flex items-center gap-2 p-3 rounded-lg ${locationColorMap[loc.location] || "bg-gray-100 text-gray-800"} cursor-pointer hover:opacity-80 transition-opacity`}>
                       <Package className="w-4 h-4 shrink-0" />
                       <div className="min-w-0">
                         <div className="text-xs font-semibold capitalize truncate">
-                          {loc.location.toLowerCase().replace(/_/g, " ")}
+                          {locationLabelMap[loc.location] || loc.location.replace(/_/g, " ").toLowerCase()}
                         </div>
                         <div className="text-xs opacity-70">{loc._count.location} items</div>
                       </div>

@@ -7,7 +7,6 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Card, CardContent } from "@/components/ui/card"
-import { Checkbox } from "@/components/ui/checkbox"
 import {
   ShoppingBasket,
   ChevronRight,
@@ -112,7 +111,7 @@ export default function OnboardingPage() {
         <div className="flex items-center justify-center w-14 h-14 bg-primary rounded-2xl mb-3 shadow-lg">
           <ShoppingBasket className="w-8 h-8 text-primary-foreground" />
         </div>
-        <p className="text-sm text-muted-foreground">Let's get you set up</p>
+        <p className="text-sm text-muted-foreground">Let&apos;s get you set up</p>
 
         {/* Progress dots */}
         <div className="flex gap-2 mt-4">
@@ -137,7 +136,7 @@ export default function OnboardingPage() {
                 <Users className="w-5 h-5 text-primary" />
                 <h2 className="text-xl font-bold">Your Household</h2>
               </div>
-              <p className="text-sm text-muted-foreground">Tell us a bit about who's eating</p>
+              <p className="text-sm text-muted-foreground">Tell us a bit about who&apos;s eating</p>
             </div>
 
             <Card className="border-0 shadow-sm">
@@ -189,7 +188,7 @@ export default function OnboardingPage() {
                 <Heart className="w-5 h-5 text-primary" />
                 <h2 className="text-xl font-bold">Dietary Preferences</h2>
               </div>
-              <p className="text-sm text-muted-foreground">We'll use this for recipe suggestions and meal planning</p>
+              <p className="text-sm text-muted-foreground">We&apos;ll use this for recipe suggestions and meal planning</p>
             </div>
 
             <div className="grid grid-cols-2 gap-2">
