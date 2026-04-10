@@ -9,12 +9,15 @@ const createItemSchema = z.object({
   brand: z.string().optional(),
   quantity: z.number().positive().default(1),
   unit: z.string().default("count"),
-  location: z.enum(["FRIDGE", "FREEZER", "PANTRY", "SPICE_RACK", "COUNTER", "CELLAR", "OTHER"]).default("PANTRY"),
+  location: z.string().default("PANTRY"),
   category: z.string().optional(),
   expirationDate: z.string().optional(),
   notes: z.string().optional(),
   imageUrl: z.string().optional(),
   productId: z.string().optional(),
+  packageSize: z.number().positive().optional(),
+  packageUnit: z.string().optional(),
+  upcGroupId: z.string().optional(),
 })
 
 export async function GET(req: NextRequest) {
@@ -27,12 +30,14 @@ export async function GET(req: NextRequest) {
   const location = searchParams.get("location")
   const category = searchParams.get("category")
   const search = searchParams.get("search")
+  const barcode = searchParams.get("barcode")
   const sortBy = searchParams.get("sortBy") ?? "updatedAt"
   const sortOrder = (searchParams.get("sortOrder") ?? "desc") as "asc" | "desc"
 
   const where: Record<string, unknown> = { userId: session.user.id }
   if (location) where.location = location
   if (category) where.category = category
+  if (barcode) where.barcode = barcode
   if (search) {
     where.OR = [
       { name: { contains: search } },

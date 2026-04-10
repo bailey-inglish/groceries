@@ -10,6 +10,7 @@ export default auth((req) => {
     nextUrl.pathname.startsWith("/auth/signup")
 
   const isApiAuthRoute = nextUrl.pathname.startsWith("/api/auth")
+  const isOnboardingPage = nextUrl.pathname.startsWith("/onboarding")
 
   if (isApiAuthRoute) return NextResponse.next()
 
@@ -22,6 +23,15 @@ export default auth((req) => {
     const signInUrl = new URL("/auth/signin", nextUrl)
     signInUrl.searchParams.set("callbackUrl", nextUrl.pathname)
     return NextResponse.redirect(signInUrl)
+  }
+
+  // Gate non-onboarding pages behind onboarding completion.
+  // onboardingCompleted is stored in the JWT token (set in auth.ts).
+  if (!isOnboardingPage) {
+    const sessionUser = req.auth?.user as { id?: string; onboardingCompleted?: boolean } | undefined
+    if (sessionUser?.onboardingCompleted === false) {
+      return NextResponse.redirect(new URL("/onboarding", nextUrl))
+    }
   }
 
   return NextResponse.next()

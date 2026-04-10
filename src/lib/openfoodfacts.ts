@@ -1,4 +1,5 @@
 import { prisma } from "./prisma"
+import { parsePackageSize } from "./units"
 
 export interface ProductData {
   barcode: string
@@ -7,6 +8,8 @@ export interface ProductData {
   category?: string
   imageUrl?: string
   nutritionDataJson?: string
+  packageSize?: number
+  packageUnit?: string
 }
 
 export async function lookupProduct(barcode: string): Promise<ProductData | null> {
@@ -20,6 +23,8 @@ export async function lookupProduct(barcode: string): Promise<ProductData | null
       category: cached.category ?? undefined,
       imageUrl: cached.imageUrl ?? undefined,
       nutritionDataJson: cached.nutritionDataJson ?? undefined,
+      packageSize: cached.packageSize ?? undefined,
+      packageUnit: cached.packageUnit ?? undefined,
     }
   }
 
@@ -35,6 +40,19 @@ export async function lookupProduct(barcode: string): Promise<ProductData | null
     if (data.status !== 1 || !data.product) return null
 
     const product = data.product
+
+    // Parse package size from product_quantity (e.g. "500 g", "2 L", "12")
+    let packageSize: number | undefined
+    let packageUnit: string | undefined
+    const rawQty: string = product.product_quantity || product.quantity || ""
+    if (rawQty) {
+      const parsed = parsePackageSize(rawQty)
+      if (parsed) {
+        packageSize = parsed.size
+        packageUnit = parsed.unit
+      }
+    }
+
     const productData: ProductData = {
       barcode,
       name: product.product_name || product.product_name_en || "Unknown Product",
@@ -44,6 +62,8 @@ export async function lookupProduct(barcode: string): Promise<ProductData | null
       nutritionDataJson: product.nutriments
         ? JSON.stringify(product.nutriments)
         : undefined,
+      packageSize,
+      packageUnit,
     }
 
     // Cache in database
@@ -55,6 +75,8 @@ export async function lookupProduct(barcode: string): Promise<ProductData | null
         category: productData.category,
         imageUrl: productData.imageUrl,
         nutritionDataJson: productData.nutritionDataJson,
+        packageSize: productData.packageSize,
+        packageUnit: productData.packageUnit,
       },
     })
 

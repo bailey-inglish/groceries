@@ -10,7 +10,42 @@ const suggestSchema = z.object({
   timeOfDay: z.string().optional(),
   additionalPreferences: z.string().optional(),
   save: z.boolean().default(false),
+  // Meal assistant params
+  mealType: z.string().optional(),
+  servingSize: z.string().optional(),
+  preferences: z.array(z.string()).optional(),
+  maxPrepMinutes: z.number().int().positive().optional(),
 })
+
+interface PantryItem {
+  id: string
+  name: string
+  quantity: number
+  unit: string
+}
+
+function computeCoverage(
+  ingredients: Array<{ name: string; amount: string }>,
+  pantryItems: PantryItem[]
+): Array<{ name: string; amount: string; inPantry: boolean; pantryItemName?: string }> {
+  return ingredients.map((ing) => {
+    const ingLower = ing.name.toLowerCase().replace(/[^a-z0-9 ]/g, "").trim()
+    const ingWords = ingLower.split(/\s+/).filter((w) => w.length > 2)
+
+    const match = pantryItems.find((p) => {
+      const pLower = p.name.toLowerCase()
+      if (pLower.includes(ingLower) || ingLower.includes(pLower)) return true
+      return ingWords.some((word) => pLower.includes(word))
+    })
+
+    return {
+      name: ing.name,
+      amount: ing.amount,
+      inPantry: !!match,
+      pantryItemName: match?.name,
+    }
+  })
+}
 
 export async function POST(req: NextRequest) {
   const session = await auth()
@@ -22,7 +57,6 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Invalid request", details: parsed.error.issues }, { status: 400 })
   }
 
-  // Get user settings
   const user = await prisma.user.findUnique({
     where: { id: session.user.id },
     select: { openAiKey: true, dietaryRestrictions: true, householdSize: true },
@@ -41,10 +75,10 @@ export async function POST(req: NextRequest) {
     )
   }
 
-  // Get current inventory
   const items = await prisma.inventoryItem.findMany({
     where: { userId: session.user.id, quantity: { gt: 0 } },
-    orderBy: { expirationDate: "asc" },
+    orderBy: [{ expirationDate: "asc" }, { updatedAt: "desc" }],
+    take: 60,
   })
 
   const dietaryRestrictions: string[] = JSON.parse(user.dietaryRestrictions || "[]")
@@ -64,10 +98,19 @@ export async function POST(req: NextRequest) {
     ...parsed.data,
   })
 
-  // Optionally save to db
+  const pantryItems = items.map((i) => ({ id: i.id, name: i.name, quantity: i.quantity, unit: i.unit }))
+  const suggestionsWithCoverage = suggestions.map((s) => {
+    const ingredientMatches = computeCoverage(s.ingredients, pantryItems)
+    const inPantryCount = ingredientMatches.filter((m) => m.inPantry).length
+    const coverageScore = ingredientMatches.length > 0 ? inPantryCount / ingredientMatches.length : 0
+    return { ...s, ingredients: ingredientMatches, coverageScore }
+  })
+
+  suggestionsWithCoverage.sort((a, b) => b.coverageScore - a.coverageScore)
+
   if (parsed.data.save) {
     await Promise.all(
-      suggestions.map((s) =>
+      suggestionsWithCoverage.map((s) =>
         prisma.recipe.create({
           data: {
             userId: session.user!.id!,
@@ -86,5 +129,5 @@ export async function POST(req: NextRequest) {
     )
   }
 
-  return NextResponse.json({ suggestions })
+  return NextResponse.json({ suggestions: suggestionsWithCoverage })
 }

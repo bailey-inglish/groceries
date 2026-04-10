@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useCallback } from "react"
+import { useState, useCallback, useEffect } from "react"
 import dynamic from "next/dynamic"
 import Image from "next/image"
 import { Button } from "@/components/ui/button"
@@ -9,6 +9,8 @@ import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Skeleton } from "@/components/ui/skeleton"
+import { Badge } from "@/components/ui/badge"
+import { useLocations } from "@/hooks/use-locations"
 import {
   ScanLine,
   Package,
@@ -17,6 +19,7 @@ import {
   Loader2,
   Keyboard,
   Camera,
+  Info,
 } from "lucide-react"
 
 const BarcodeScanner = dynamic(() => import("@/components/barcode-scanner"), {
@@ -34,23 +37,18 @@ interface ProductInfo {
   brand?: string
   category?: string
   imageUrl?: string
+  packageSize?: number
+  packageUnit?: string
 }
-
-const LOCATIONS = [
-  { value: "PANTRY", label: "Pantry" },
-  { value: "FRIDGE", label: "Fridge" },
-  { value: "FREEZER", label: "Freezer" },
-  { value: "SPICE_RACK", label: "Spice Rack" },
-  { value: "COUNTER", label: "Counter" },
-  { value: "CELLAR", label: "Cellar" },
-  { value: "OTHER", label: "Other" },
-]
 
 type ScanMode = "camera" | "manual"
 type ScanType = "SCAN_IN" | "SCAN_OUT"
 type Stage = "scan" | "product" | "details" | "success" | "error"
 
 export default function ScanPage() {
+  const { locations } = useLocations()
+  const defaultLocation = locations[0]?.slug || "PANTRY"
+
   const [mode, setMode] = useState<ScanMode>("camera")
   const [stage, setStage] = useState<Stage>("scan")
   const [manualBarcode, setManualBarcode] = useState("")
@@ -59,11 +57,22 @@ export default function ScanPage() {
   const [productError, setProductError] = useState("")
   const [scanType, setScanType] = useState<ScanType>("SCAN_IN")
   const [quantity, setQuantity] = useState("1")
-  const [location, setLocation] = useState("PANTRY")
+  const [location, setLocation] = useState("")
   const [customName, setCustomName] = useState("")
+  const [customBrand, setCustomBrand] = useState("")
   const [expirationDate, setExpirationDate] = useState("")
+  const [packageSizeInput, setPackageSizeInput] = useState("")
+  const [packageUnitInput, setPackageUnitInput] = useState("")
+  const [showPackageSizePrompt, setShowPackageSizePrompt] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const [lastScanned, setLastScanned] = useState("")
+
+  // Set default location when locations load
+  useEffect(() => {
+    if (locations.length > 0 && !location) {
+      setLocation(locations[0].slug)
+    }
+  }, [locations, location])
 
   const lookupBarcode = useCallback(async (barcode: string) => {
     if (barcode === lastScanned) return
@@ -73,16 +82,42 @@ export default function ScanPage() {
     setStage("product")
 
     try {
-      const res = await fetch(`/api/products/lookup?barcode=${encodeURIComponent(barcode)}`)
-      if (res.ok) {
-        const data = await res.json()
-        setProduct(data.product)
-        setCustomName(data.product.name)
+      // Check for user's UPC profile first (custom name overrides)
+      const [productRes, profileRes] = await Promise.all([
+        fetch(`/api/products/lookup?barcode=${encodeURIComponent(barcode)}`),
+        fetch(`/api/upc-profiles?barcode=${encodeURIComponent(barcode)}`),
+      ])
+
+      let productData: ProductInfo = { barcode, name: "" }
+      if (productRes.ok) {
+        const data = await productRes.json()
+        productData = { ...data.product, barcode }
       } else {
-        // Product not found - allow manual entry
-        setProduct({ barcode, name: "" })
-        setCustomName("")
         setProductError("Product not found. Enter details manually.")
+      }
+
+      // UPCProfile wins over API data for name/brand
+      if (profileRes.ok) {
+        const profileData = await profileRes.json()
+        if (profileData.profile) {
+          productData.name = profileData.profile.customName
+          if (profileData.profile.customBrand) productData.brand = profileData.profile.customBrand
+          if (profileData.profile.packageSize) productData.packageSize = profileData.profile.packageSize
+          if (profileData.profile.packageUnit) productData.packageUnit = profileData.profile.packageUnit
+          if (profileData.profile.defaultLocation) setLocation(profileData.profile.defaultLocation)
+        }
+      }
+
+      setProduct(productData)
+      setCustomName(productData.name || "")
+      setCustomBrand(productData.brand || "")
+
+      if (productData.packageSize) {
+        setPackageSizeInput(String(productData.packageSize))
+        setPackageUnitInput(productData.packageUnit || "count")
+      } else {
+        // No package size — show the prompt after details form
+        setShowPackageSizePrompt(true)
       }
     } catch {
       setProductError("Failed to look up product")
@@ -102,47 +137,71 @@ export default function ScanPage() {
 
     setSubmitting(true)
     try {
-      // First check if item exists by barcode
-      let inventoryItemId: string | null = null
+      const barcode = product.barcode
 
-      if (scanType === "SCAN_OUT" && product.barcode) {
-        const searchRes = await fetch(`/api/inventory?search=${encodeURIComponent(customName)}`)
+      // Persist custom name/brand/package size in UPCProfile if barcode known
+      if (barcode) {
+        await fetch("/api/upc-profiles", {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            barcode,
+            customName: customName.trim(),
+            customBrand: customBrand.trim() || undefined,
+            defaultLocation: location,
+            packageSize: packageSizeInput ? parseFloat(packageSizeInput) : undefined,
+            packageUnit: packageUnitInput || undefined,
+          }),
+        })
+      }
+
+      if (scanType === "SCAN_OUT" && barcode) {
+        // Find existing items with this barcode, sorted by expiration (FEFO)
+        const searchRes = await fetch(`/api/inventory?barcode=${encodeURIComponent(barcode)}`)
         const searchData = await searchRes.json()
-        const existing = searchData.items?.find(
-          (i: { barcode?: string; id: string }) => i.barcode === product.barcode
-        )
-        if (existing) inventoryItemId = existing.id
+        const existing = (searchData.items || [])
+          .filter((i: { barcode?: string }) => i.barcode === barcode)
+          .sort((a: { expirationDate?: string }, b: { expirationDate?: string }) => {
+            if (!a.expirationDate && !b.expirationDate) return 0
+            if (!a.expirationDate) return 1
+            if (!b.expirationDate) return -1
+            return new Date(a.expirationDate).getTime() - new Date(b.expirationDate).getTime()
+          })
+
+        if (existing.length > 0) {
+          // Deduct from the soonest-expiring item (FEFO)
+          await fetch(`/api/inventory/${existing[0].id}/scan`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              eventType: "SCAN_OUT",
+              quantityChange: parseFloat(quantity) || 1,
+            }),
+          })
+          setStage("success")
+          return
+        }
       }
 
-      if (inventoryItemId && scanType === "SCAN_OUT") {
-        // Scan out from existing item
-        await fetch(`/api/inventory/${inventoryItemId}/scan`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            eventType: "SCAN_OUT",
-            quantityChange: parseFloat(quantity) || 1,
-          }),
-        })
-      } else {
-        // Add new item or scan in
-        await fetch("/api/inventory", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            barcode: product.barcode,
-            name: customName,
-            brand: product.brand,
-            category: product.category,
-            imageUrl: product.imageUrl,
-            quantity: parseFloat(quantity) || 1,
-            unit: "count",
-            location,
-            expirationDate: expirationDate || undefined,
-            productId: undefined,
-          }),
-        })
-      }
+      // SCAN_IN — add new stack member with upcGroupId = barcode
+      await fetch("/api/inventory", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          barcode,
+          name: customName.trim(),
+          brand: customBrand.trim() || product.brand,
+          category: product.category,
+          imageUrl: product.imageUrl,
+          quantity: parseFloat(quantity) || 1,
+          unit: packageUnitInput || "count",
+          location: location || defaultLocation,
+          expirationDate: expirationDate || undefined,
+          packageSize: packageSizeInput ? parseFloat(packageSizeInput) : undefined,
+          packageUnit: packageUnitInput || undefined,
+          upcGroupId: barcode || undefined,
+        }),
+      })
 
       setStage("success")
     } catch {
@@ -157,10 +216,14 @@ export default function ScanPage() {
     setProduct(null)
     setProductError("")
     setCustomName("")
+    setCustomBrand("")
     setManualBarcode("")
     setQuantity("1")
     setExpirationDate("")
     setLastScanned("")
+    setPackageSizeInput("")
+    setPackageUnitInput("")
+    setShowPackageSizePrompt(false)
   }
 
   if (stage === "success") {
@@ -209,7 +272,6 @@ export default function ScanPage() {
           <h1 className="text-lg font-bold">Scan Product</h1>
         </div>
 
-        {/* Scan Type Toggle */}
         <div className="max-w-lg mx-auto px-4 pb-3 flex gap-2">
           <button
             onClick={() => setScanType("SCAN_IN")}
@@ -237,7 +299,6 @@ export default function ScanPage() {
       <div className="max-w-lg mx-auto px-4 py-4 space-y-4">
         {(stage === "scan" || stage === "product") && (
           <>
-            {/* Mode Toggle */}
             <div className="flex gap-2 bg-secondary rounded-lg p-1">
               <button
                 onClick={() => setMode("camera")}
@@ -337,6 +398,9 @@ export default function ScanPage() {
                     <div className="text-xs font-normal text-muted-foreground">{product.brand}</div>
                   )}
                 </div>
+                {product?.barcode && (
+                  <Badge variant="outline" className="text-xs shrink-0">{product.barcode}</Badge>
+                )}
               </CardTitle>
               {productError && (
                 <p className="text-xs text-yellow-600 mt-1">{productError}</p>
@@ -349,6 +413,19 @@ export default function ScanPage() {
                   value={customName}
                   onChange={(e) => setCustomName(e.target.value)}
                   placeholder="Product name"
+                  className="h-11"
+                />
+                {product?.barcode && (
+                  <p className="text-xs text-muted-foreground">Custom names are saved per barcode for future scans</p>
+                )}
+              </div>
+
+              <div className="space-y-1.5">
+                <Label>Brand (optional)</Label>
+                <Input
+                  value={customBrand}
+                  onChange={(e) => setCustomBrand(e.target.value)}
+                  placeholder="e.g. Heinz, Generic"
                   className="h-11"
                 />
               </div>
@@ -373,15 +450,49 @@ export default function ScanPage() {
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      {LOCATIONS.map((loc) => (
-                        <SelectItem key={loc.value} value={loc.value}>
-                          {loc.label}
-                        </SelectItem>
+                      {locations.map((loc) => (
+                        <SelectItem key={loc.slug} value={loc.slug}>{loc.name}</SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
                 </div>
               </div>
+
+              {/* Package size */}
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1.5">
+                  <Label className="flex items-center gap-1">
+                    Package Size
+                    {showPackageSizePrompt && !packageSizeInput && (
+                      <Info className="w-3 h-3 text-amber-500" />
+                    )}
+                  </Label>
+                  <Input
+                    type="number"
+                    min="0.01"
+                    step="0.01"
+                    value={packageSizeInput}
+                    onChange={(e) => setPackageSizeInput(e.target.value)}
+                    placeholder="e.g. 12"
+                    className="h-11"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label>Unit</Label>
+                  <Input
+                    value={packageUnitInput}
+                    onChange={(e) => setPackageUnitInput(e.target.value)}
+                    placeholder="count, g, ml, oz…"
+                    className="h-11"
+                  />
+                </div>
+              </div>
+              {showPackageSizePrompt && !packageSizeInput && (
+                <p className="text-xs text-amber-600 flex items-center gap-1">
+                  <Info className="w-3 h-3 shrink-0" />
+                  Adding package size helps track how much you have left (e.g. 12 eggs, 2 L, 500 g)
+                </p>
+              )}
 
               <div className="space-y-1.5">
                 <Label>Expiration Date (optional)</Label>

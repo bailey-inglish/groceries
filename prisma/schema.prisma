@@ -18,6 +18,8 @@ model User {
   householdSize        Int                @default(1)
   dietaryRestrictions  String             @default("[]")
   openAiKey            String?
+  onboardingCompleted  Boolean            @default(false)
+  shoppingTripLagDays  Int                @default(2)
   createdAt            DateTime           @default(now())
   updatedAt            DateTime           @updatedAt
 
@@ -25,6 +27,47 @@ model User {
   stockEvents          StockEvent[]
   recipes              Recipe[]
   shoppingListItems    ShoppingListItem[]
+  locations            UserLocation[]
+  upcProfiles          UPCProfile[]
+  mealPlans            MealPlan[]
+  dayProfiles          DayProfile[]
+}
+
+/// Per-user customized product data keyed by barcode.
+/// Profile values win over API data for name/brand/unit/packageSize.
+model UPCProfile {
+  id              String   @id @default(cuid())
+  userId          String
+  barcode         String
+  customName      String
+  customBrand     String?
+  defaultLocation String?
+  defaultUnit     String?
+  packageSize     Float?
+  packageUnit     String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, barcode])
+}
+
+/// User-configurable storage locations (defaults + custom).
+model UserLocation {
+  id        String   @id @default(cuid())
+  userId    String
+  name      String
+  slug      String   // uppercase slug used for storage (e.g. "PANTRY", "MY_GARAGE")
+  color     String   @default("bg-gray-100 text-gray-700")
+  isDefault Boolean  @default(false)
+  isVisible Boolean  @default(true)
+  sortOrder Int      @default(0)
+  createdAt DateTime @default(now())
+
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, slug])
 }
 
 model Product {
@@ -35,6 +78,8 @@ model Product {
   category         String?
   imageUrl         String?
   nutritionDataJson String?
+  packageSize      Float?
+  packageUnit      String?
   createdAt        DateTime        @default(now())
 
   inventoryItems   InventoryItem[]
@@ -54,6 +99,13 @@ model InventoryItem {
   expirationDate DateTime?
   notes          String?
   imageUrl       String?
+  // Package metadata
+  packageSize    Float?
+  packageUnit    String?
+  // UPC stack fields
+  isOpened       Boolean            @default(false)
+  openedAt       DateTime?
+  upcGroupId     String?            // groups same-barcode items; populated on scan-in
   createdAt      DateTime           @default(now())
   updatedAt      DateTime           @updatedAt
 
@@ -67,9 +119,12 @@ model StockEvent {
   id              String        @id @default(cuid())
   inventoryItemId String
   userId          String
-  eventType       String        // SCAN_IN / SCAN_OUT / MANUAL_ADJUST
+  eventType       String        // SCAN_IN / SCAN_OUT / MANUAL_ADJUST / OPEN / VERIFY_QUANTITY / MEAL_COOKED
   quantityChange  Float
-  notes           String?
+  quantityBefore  Float?
+  quantityAfter   Float?
+  note            String?
+  notes           String?       // legacy — kept for backward compat
   createdAt       DateTime      @default(now())
 
   inventoryItem   InventoryItem @relation(fields: [inventoryItemId], references: [id], onDelete: Cascade)
@@ -77,20 +132,35 @@ model StockEvent {
 }
 
 model Recipe {
-  id           String   @id @default(cuid())
+  id           String              @id @default(cuid())
   userId       String
   title        String
   description  String?
-  ingredients  String   @default("[]")
+  ingredients  String              @default("[]")  // legacy JSON — still used for backward compat
   instructions String
-  servings     Int      @default(4)
-  prepTimeMin  Int      @default(0)
-  cookTimeMin  Int      @default(0)
-  tags         String   @default("[]")
-  source       String   @default("USER")
-  createdAt    DateTime @default(now())
+  servings     Int                 @default(4)
+  prepTimeMin  Int                 @default(0)
+  cookTimeMin  Int                 @default(0)
+  tags         String              @default("[]")
+  source       String              @default("USER")
+  createdAt    DateTime            @default(now())
 
-  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user              User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  recipeIngredients RecipeIngredient[]
+  mealPlanEntries   MealPlanEntry[]
+}
+
+/// Structured ingredient linked to a recipe. Replaces the JSON blob over time.
+model RecipeIngredient {
+  id        String  @id @default(cuid())
+  recipeId  String
+  name      String
+  quantity  Float
+  unit      String  @default("count")
+  barcode   String?             // links to a specific UPC if known
+  optional  Boolean @default(false)
+
+  recipe    Recipe  @relation(fields: [recipeId], references: [id], onDelete: Cascade)
 }
 
 model ShoppingListItem {
@@ -102,8 +172,54 @@ model ShoppingListItem {
   unit                String         @default("count")
   isPurchased         Boolean        @default(false)
   predictedRunOutDate DateTime?
+  fromMealPlan        Boolean        @default(false)
   createdAt           DateTime       @default(now())
 
   user                User           @relation(fields: [userId], references: [id], onDelete: Cascade)
   inventoryItem       InventoryItem? @relation(fields: [inventoryItemId], references: [id], onDelete: SetNull)
+}
+
+// ─── Meal Planning ────────────────────────────────────────────────────────────
+
+model MealPlan {
+  id            String          @id @default(cuid())
+  userId        String
+  weekStartDate DateTime
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime        @updatedAt
+
+  user          User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  entries       MealPlanEntry[]
+}
+
+model MealPlanEntry {
+  id             String    @id @default(cuid())
+  mealPlanId     String
+  date           DateTime
+  mealType       String    // BREAKFAST | LUNCH | DINNER | SNACK
+  recipeId       String?
+  customMealName String?
+  notes          String?
+  status         String    @default("PLANNED") // PLANNED | COOKED | SKIPPED
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  mealPlan       MealPlan  @relation(fields: [mealPlanId], references: [id], onDelete: Cascade)
+  recipe         Recipe?   @relation(fields: [recipeId], references: [id], onDelete: SetNull)
+}
+
+/// Per-day cooking preferences for the meal planner.
+model DayProfile {
+  id             String   @id @default(cuid())
+  userId         String
+  dayOfWeek      Int      // 0 = Sunday … 6 = Saturday
+  maxPrepMinutes Int?
+  mealPrefs      String   @default("{}") // JSON: { breakfast: {mood}, lunch: {mood}, ... }
+  tags           String   @default("[]") // e.g. ["quick","comfort"]
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, dayOfWeek])
 }
