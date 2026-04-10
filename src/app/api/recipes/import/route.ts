@@ -39,14 +39,9 @@ export async function POST(req: NextRequest) {
 
   const { url } = parsed.data
 
-  const user = await prisma.user.findUnique({
-    where: { id: session.user.id },
-    select: { openAiKey: true },
-  })
-
-  const apiKey = user?.openAiKey || process.env.GEMINI_API_KEY
+  const apiKey = process.env.GEMINI_API_KEY
   if (!apiKey) {
-    return NextResponse.json({ error: "API key not configured" }, { status: 400 })
+    return NextResponse.json({ error: "Gemini API key not configured" }, { status: 400 })
   }
 
   // Fetch page HTML
@@ -62,8 +57,7 @@ export async function POST(req: NextRequest) {
   }
 
   const truncatedHtml = html.slice(0, 12000)
-  const model = process.env.GEMINI_MODEL || FREE_MODELS_FALLBACK
-  const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${encodeURIComponent(apiKey)}`
+  const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${FREE_MODELS_FALLBACK}:generateContent?key=${encodeURIComponent(apiKey)}`
 
   let parsedRecipe
   try {

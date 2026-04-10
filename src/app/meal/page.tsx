@@ -23,6 +23,8 @@ import {
   Save,
   CheckCircle2,
   ChevronLeft,
+  Package,
+  ScanLine,
 } from "lucide-react"
 
 // ─── Types ──────────────────────────────────────────────────────────────────
@@ -33,6 +35,7 @@ type MealType = "BREAKFAST" | "LUNCH" | "DINNER" | "SNACK"
 type ServingSize = "solo" | "two" | "group" | "feast"
 type Pref = string
 type TimeOption = 15 | 30 | 60 | 999
+type RecipeGenerationStatus = "success" | "need_more_ingredients" | "error" | "policy_violation"
 
 interface IngredientMatch {
   name: string
@@ -51,6 +54,14 @@ interface RecipeSuggestion {
   cookTimeMin: number
   tags: string[]
   coverageScore: number
+}
+
+interface RecipeGenerationResponse {
+  status: RecipeGenerationStatus
+  message: string
+  recipes: RecipeSuggestion[]
+  suggestions?: RecipeSuggestion[]
+  missingIngredients?: string[]
 }
 
 // ─── Constants ──────────────────────────────────────────────────────────────
@@ -414,6 +425,38 @@ function LoadingState({ pantryCount }: { pantryCount: number }) {
   )
 }
 
+function PantryGate({ pantryCount }: { pantryCount: number }) {
+  return (
+    <div className="min-h-screen bg-gray-50 flex items-center justify-center px-4 py-8">
+      <Card className="w-full max-w-lg border-0 shadow-sm">
+        <CardContent className="p-6 text-center space-y-4">
+          <div className="w-16 h-16 rounded-2xl bg-primary/10 flex items-center justify-center mx-auto">
+            <Package className="w-8 h-8 text-primary" />
+          </div>
+          <div className="space-y-1">
+            <h1 className="text-xl font-bold">Add a few more items first</h1>
+            <p className="text-sm text-muted-foreground">
+              Meal ideas unlock once you have at least two items in your inventory.
+            </p>
+          </div>
+          <div className="rounded-xl bg-secondary/60 px-4 py-3 text-sm">
+            You currently have <span className="font-semibold">{pantryCount}</span> item{pantryCount === 1 ? "" : "s"}.
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <Button onClick={() => (window.location.href = "/scan")} className="gap-2">
+              <ScanLine className="w-4 h-4" />
+              Scan an item
+            </Button>
+            <Button variant="outline" onClick={() => (window.location.href = "/")}>
+              Go to inventory
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  )
+}
+
 // ─── Page ────────────────────────────────────────────────────────────────────
 
 export default function MealPage() {
@@ -426,16 +469,35 @@ export default function MealPage() {
   const [activePrefs, setActivePrefs] = useState<Pref[]>([])
   const [results, setResults] = useState<RecipeSuggestion[]>([])
   const [error, setError] = useState("")
-  const [pantryCount, setPantryCount] = useState(0)
+  const [generationStatus, setGenerationStatus] = useState<RecipeGenerationStatus | null>(null)
+  const [generationMessage, setGenerationMessage] = useState("")
+  const [missingIngredients, setMissingIngredients] = useState<string[]>([])
+  const [pantryCount, setPantryCount] = useState<number | null>(null)
+  const [pantryLoaded, setPantryLoaded] = useState(false)
   const [cookSheet, setCookSheet] = useState<RecipeSuggestion | null>(null)
   const [cookedRecipes, setCookedRecipes] = useState<Set<string>>(new Set())
 
   // Fetch pantry count for loading state display
   useEffect(() => {
+    let active = true
+
     fetch("/api/inventory?sortBy=updatedAt")
       .then((r) => r.json())
-      .then((d) => setPantryCount(d.items?.length || 0))
-      .catch(() => {})
+      .then((d) => {
+        if (!active) return
+        setPantryCount(d.items?.length ?? 0)
+      })
+      .catch(() => {
+        if (!active) return
+        setPantryCount(null)
+      })
+      .finally(() => {
+        if (active) setPantryLoaded(true)
+      })
+
+    return () => {
+      active = false
+    }
   }, [])
 
   // Auto-detect time of day for default meal type
@@ -508,6 +570,9 @@ export default function MealPage() {
   async function handleFind() {
     setPhase("loading")
     setError("")
+    setGenerationStatus(null)
+    setGenerationMessage("")
+    setMissingIngredients([])
 
     try {
       const res = await fetch("/api/recipes/suggest", {
@@ -521,14 +586,26 @@ export default function MealPage() {
         }),
       })
 
-      const data = await res.json()
+      const data = (await res.json()) as Partial<RecipeGenerationResponse> & { error?: string; suggestions?: RecipeSuggestion[] }
       if (!res.ok) {
-        setError(data.error || "Couldn't generate meal ideas. Try again!")
+        setError(data.error || data.message || "Couldn't generate meal ideas. Try again!")
         setPhase("setup")
         return
       }
 
-      setResults(data.suggestions || [])
+      const status = data.status || "success"
+      const recipes = data.recipes || data.suggestions || []
+      setResults(recipes)
+      setGenerationStatus(status)
+      setGenerationMessage(data.message || "")
+      setMissingIngredients(data.missingIngredients || [])
+
+      if (status === "error") {
+        setError(data.message || "Couldn't generate meal ideas. Try again!")
+        setPhase("setup")
+        return
+      }
+
       setPhase("results")
     } catch {
       setError("Something went wrong. Check your connection and try again.")
@@ -541,8 +618,17 @@ export default function MealPage() {
     setStep(1)
     setResults([])
     setError("")
+    setGenerationStatus(null)
+    setGenerationMessage("")
+    setMissingIngredients([])
     setSelectedPrefs([])
     setCookedRecipes(new Set())
+  }
+
+  const pantryLocked = pantryLoaded && pantryCount !== null && pantryCount < 2
+
+  if (pantryLocked && pantryCount !== null) {
+    return <PantryGate pantryCount={pantryCount} />
   }
 
   async function handleCookConfirm(ingredients: IngredientMatch[]) {
@@ -785,7 +871,7 @@ export default function MealPage() {
           </div>
         </div>
         <div className="max-w-lg mx-auto">
-          <LoadingState pantryCount={pantryCount} />
+          <LoadingState pantryCount={pantryCount ?? 0} />
         </div>
       </div>
     )
@@ -816,14 +902,41 @@ export default function MealPage() {
       </div>
 
       <div className="max-w-lg mx-auto px-4 py-4 space-y-4">
+        {generationStatus && generationStatus !== "success" && (
+          <Card className="border-0 shadow-sm border-amber-200 bg-amber-50/80">
+            <CardContent className="p-4 space-y-2">
+              <div className="flex items-center justify-between gap-2">
+                <p className="text-sm font-semibold text-amber-900 capitalize">
+                  {generationStatus.replace(/_/g, " ")}
+                </p>
+                <Badge variant="outline" className="text-[10px] uppercase tracking-wide border-amber-300 text-amber-700">
+                  Gemini
+                </Badge>
+              </div>
+              {generationMessage && <p className="text-sm text-amber-900/90">{generationMessage}</p>}
+              {missingIngredients.length > 0 && (
+                <div className="text-xs text-amber-800">
+                  <span className="font-semibold">Missing ingredients:</span> {missingIngredients.join(", ")}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        )}
+
         {results.length === 0 ? (
           <div className="text-center py-12">
             <ChefHat className="w-14 h-14 text-muted-foreground/30 mx-auto mb-3" />
-            <h3 className="font-semibold mb-1">No ideas found</h3>
+            <h3 className="font-semibold mb-1">
+              {generationStatus === "need_more_ingredients" ? "Close, but not quite" : "No ideas found"}
+            </h3>
             <p className="text-sm text-muted-foreground mb-4">
-              Try scanning more items or relaxing the time constraint.
+              {generationStatus === "need_more_ingredients"
+                ? "Add the missing items above, then try again."
+                : "Try scanning more items or relaxing the time constraint."}
             </p>
-            <Button onClick={handleReset}>Try again</Button>
+            <Button onClick={handleReset}>
+              {generationStatus === "need_more_ingredients" ? "Back to setup" : "Try again"}
+            </Button>
           </div>
         ) : (
           <>

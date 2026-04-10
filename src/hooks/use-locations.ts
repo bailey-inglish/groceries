@@ -20,7 +20,7 @@ export function useLocations() {
     try {
       const res = await fetch("/api/locations")
       const data = await res.json()
-      setLocations((data.locations || []).filter((l: UserLocation) => l.isVisible))
+      setLocations(data.locations || [])
     } finally {
       setLoading(false)
     }
@@ -30,6 +30,7 @@ export function useLocations() {
     fetchLocations()
   }, [])
 
+  const visibleLocations = locations.filter((location) => location.isVisible)
   const locationMap = Object.fromEntries(locations.map((l) => [l.slug, l]))
 
   function getColor(slug: string): string {
@@ -40,5 +41,5 @@ export function useLocations() {
     return locationMap[slug]?.name || slug.replace(/_/g, " ").toLowerCase().replace(/\b\w/g, (c) => c.toUpperCase())
   }
 
-  return { locations, loading, getColor, getLabel, refetch: fetchLocations }
+  return { locations: visibleLocations, allLocations: locations, loading, getColor, getLabel, refetch: fetchLocations }
 }

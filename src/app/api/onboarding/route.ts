@@ -43,7 +43,7 @@ export async function POST(req: NextRequest) {
   await prisma.user.update({
     where: { id: session.user.id },
     data: {
-      name: name || undefined,
+      name: name?.trim() || session.user.name || undefined,
       householdSize,
       dietaryRestrictions: JSON.stringify(allRestrictions),
       onboardingCompleted: true,

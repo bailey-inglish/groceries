@@ -7,7 +7,6 @@ const updateSettingsSchema = z.object({
   name: z.string().optional(),
   householdSize: z.number().int().positive().optional(),
   dietaryRestrictions: z.array(z.string()).optional(),
-  openAiKey: z.string().optional(),
 })
 
 export async function GET() {
@@ -22,7 +21,6 @@ export async function GET() {
       name: true,
       householdSize: true,
       dietaryRestrictions: true,
-      openAiKey: true,
     },
   })
 
@@ -31,8 +29,6 @@ export async function GET() {
   return NextResponse.json({
     ...user,
     dietaryRestrictions: JSON.parse(user.dietaryRestrictions || "[]"),
-    hasOpenAiKey: !!user.openAiKey,
-    openAiKey: user.openAiKey ? "••••••••••••" : "",
   })
 }
 
@@ -46,14 +42,11 @@ export async function PUT(req: NextRequest) {
     return NextResponse.json({ error: "Invalid request", details: parsed.error.issues }, { status: 400 })
   }
 
-  const { dietaryRestrictions, openAiKey, ...rest } = parsed.data
+  const { dietaryRestrictions, ...rest } = parsed.data
 
   const updateData: Record<string, unknown> = { ...rest }
   if (dietaryRestrictions !== undefined) {
     updateData.dietaryRestrictions = JSON.stringify(dietaryRestrictions)
-  }
-  if (openAiKey !== undefined && openAiKey !== "••••••••••••") {
-    updateData.openAiKey = openAiKey || null
   }
 
   const user = await prisma.user.update({

@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
 import { useSession } from "next-auth/react"
 import { Button } from "@/components/ui/button"
@@ -42,9 +42,10 @@ const DEFAULT_LOCATIONS = [
 
 export default function OnboardingPage() {
   const router = useRouter()
-  const { update: updateSession } = useSession()
+  const { data: session, update: updateSession } = useSession()
   const [step, setStep] = useState(1)
   const [saving, setSaving] = useState(false)
+  const [submitError, setSubmitError] = useState<string | null>(null)
 
   // Step 1: Profile
   const [name, setName] = useState("")
@@ -58,6 +59,20 @@ export default function OnboardingPage() {
   const [visibleSlugs, setVisibleSlugs] = useState<string[]>(DEFAULT_LOCATIONS.map((l) => l.slug))
   const [customLocations, setCustomLocations] = useState<{ name: string; color: string }[]>([])
   const [newLocationName, setNewLocationName] = useState("")
+
+  useEffect(() => {
+    document.body.classList.add("onboarding-active")
+    return () => {
+      document.body.classList.remove("onboarding-active")
+    }
+  }, [])
+
+  useEffect(() => {
+    const sessionName = session?.user?.name?.trim()
+    if (sessionName && !name) {
+      setName(sessionName)
+    }
+  }, [session?.user?.name, name])
 
   function toggleDietary(id: string) {
     setDietary((prev) =>
@@ -80,8 +95,9 @@ export default function OnboardingPage() {
 
   async function handleFinish() {
     setSaving(true)
+    setSubmitError(null)
     try {
-      await fetch("/api/onboarding", {
+      const response = await fetch("/api/onboarding", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -93,6 +109,12 @@ export default function OnboardingPage() {
           customLocations,
         }),
       })
+
+      if (!response.ok) {
+        setSubmitError("We couldn\'t finish setup. Please try again.")
+        return
+      }
+
       // Update the JWT session so middleware allows through
       await updateSession({ onboardingCompleted: true })
       router.push("/")
@@ -300,8 +322,12 @@ export default function OnboardingPage() {
       </div>
 
       {/* Navigation */}
-      <div className="sticky bottom-0 bg-white border-t px-4 py-4 safe-bottom">
-        <div className="max-w-lg mx-auto flex gap-3">
+      <div className="sticky bottom-0 bg-white border-t px-4 pt-4 pb-[calc(env(safe-area-inset-bottom)+1rem)]">
+        <div className="max-w-lg mx-auto flex flex-col gap-3">
+          {submitError && (
+            <p className="text-sm text-destructive">{submitError}</p>
+          )}
+          <div className="flex gap-3">
           {step > 1 && (
             <Button
               variant="outline"
@@ -339,6 +365,7 @@ export default function OnboardingPage() {
               )}
             </Button>
           )}
+          </div>
         </div>
       </div>
     </div>

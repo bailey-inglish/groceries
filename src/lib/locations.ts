@@ -12,12 +12,25 @@ export const DEFAULT_LOCATIONS = [
 ]
 
 export async function seedDefaultLocations(userId: string) {
-  // Only seed if the user has no locations yet
-  const count = await prisma.userLocation.count({ where: { userId } })
-  if (count > 0) return
+  try {
+    // Only seed if the user has no locations yet
+    const count = await prisma.userLocation.count({ where: { userId } })
+    if (count > 0) return
 
-  await prisma.userLocation.createMany({
-    data: DEFAULT_LOCATIONS.map((loc) => ({ ...loc, userId, isDefault: true, isVisible: true })),
-    skipDuplicates: true,
-  })
+    await prisma.userLocation.createMany({
+      data: DEFAULT_LOCATIONS.map((loc) => ({ ...loc, userId, isDefault: true, isVisible: true })),
+      skipDuplicates: true,
+    })
+  } catch (error) {
+    // If schema is behind (missing UserLocation table), avoid crashing page render.
+    if (
+      typeof error === "object" &&
+      error !== null &&
+      "code" in error &&
+      (error as { code?: string }).code === "P2021"
+    ) {
+      return
+    }
+    throw error
+  }
 }

@@ -1,6 +1,14 @@
 import { prisma } from "./prisma"
 import { parsePackageSize } from "./units"
 
+function normalizeCategoryTag(tag: string): string {
+  return tag
+    .replace(/^([a-z]{2}):/i, "")
+    .replace(/_/g, " ")
+    .trim()
+    .replace(/\b\w/g, (char) => char.toUpperCase())
+}
+
 export interface ProductData {
   barcode: string
   name: string
@@ -41,6 +49,16 @@ export async function lookupProduct(barcode: string): Promise<ProductData | null
 
     const product = data.product
 
+    const categoriesTags = Array.isArray(product.categories_tags)
+      ? product.categories_tags
+          .map((tag: string) => normalizeCategoryTag(tag))
+          .filter(Boolean)
+      : []
+
+    const mainCategory = typeof product.main_category === "string" && product.main_category.trim().length > 0
+      ? normalizeCategoryTag(product.main_category)
+      : undefined
+
     // Parse package size from product_quantity (e.g. "500 g", "2 L", "12")
     let packageSize: number | undefined
     let packageUnit: string | undefined
@@ -57,7 +75,12 @@ export async function lookupProduct(barcode: string): Promise<ProductData | null
       barcode,
       name: product.product_name || product.product_name_en || "Unknown Product",
       brand: product.brands || undefined,
-      category: product.categories || undefined,
+      category:
+        mainCategory ||
+        categoriesTags[0] ||
+        (typeof product.categories === "string" && product.categories.trim().length > 0
+          ? product.categories.split(",")[0].trim()
+          : undefined),
       imageUrl: product.image_url || product.image_front_url || undefined,
       nutritionDataJson: product.nutriments
         ? JSON.stringify(product.nutriments)

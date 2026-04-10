@@ -12,7 +12,6 @@ import { Separator } from "@/components/ui/separator"
 import { Skeleton } from "@/components/ui/skeleton"
 import {
   User,
-  Key,
   LogOut,
   Save,
   Loader2,
@@ -37,8 +36,6 @@ interface Settings {
   name?: string
   householdSize: number
   dietaryRestrictions: string[]
-  hasOpenAiKey: boolean
-  openAiKey: string
 }
 
 export default function SettingsPage() {
@@ -50,7 +47,6 @@ export default function SettingsPage() {
     name: "",
     householdSize: 1,
     dietaryRestrictions: [] as string[],
-    openAiKey: "",
   })
 
   useEffect(() => {
@@ -62,7 +58,6 @@ export default function SettingsPage() {
           name: data.name || "",
           householdSize: data.householdSize || 1,
           dietaryRestrictions: data.dietaryRestrictions || [],
-          openAiKey: "",
         })
         setLoading(false)
       })
@@ -79,9 +74,6 @@ export default function SettingsPage() {
         householdSize: form.householdSize,
         dietaryRestrictions: form.dietaryRestrictions,
       }
-      if (form.openAiKey) {
-        payload.openAiKey = form.openAiKey
-      }
 
       await fetch("/api/settings", {
         method: "PUT",
@@ -89,7 +81,6 @@ export default function SettingsPage() {
         body: JSON.stringify(payload),
       })
       setSaved(true)
-      setForm((prev) => ({ ...prev, openAiKey: "" }))
       setTimeout(() => setSaved(false), 3000)
     } finally {
       setSaving(false)
@@ -237,36 +228,17 @@ export default function SettingsPage() {
             </CardContent>
           </Card>
 
-          {/* AI Provider Key */}
+          {/* AI provider */}
           <Card className="border-0 shadow-sm">
             <CardHeader className="pb-2 pt-4 px-4">
               <CardTitle className="text-base flex items-center gap-2">
-                <Key className="w-4 h-4 text-muted-foreground" />
+                <CheckCircle className="w-4 h-4 text-muted-foreground" />
                 AI Integration
               </CardTitle>
             </CardHeader>
             <CardContent className="px-4 pb-4 space-y-3">
               <p className="text-sm text-muted-foreground">
-                Add your Gemini API key to enable AI-powered recipe suggestions.
-              </p>
-              <div className="space-y-1.5">
-                <Label>Gemini API Key</Label>
-                <Input
-                  type="password"
-                  value={form.openAiKey}
-                  onChange={(e) => setForm({ ...form, openAiKey: e.target.value })}
-                  placeholder={settings?.hasOpenAiKey ? "••••••••••••• (already set)" : "AIza..."}
-                  className="h-11 font-mono"
-                />
-              </div>
-              {settings?.hasOpenAiKey && (
-                <div className="flex items-center gap-1.5 text-xs text-green-600">
-                  <CheckCircle className="w-3.5 h-3.5" />
-                  API key is configured
-                </div>
-              )}
-              <p className="text-xs text-muted-foreground">
-                Your key is stored securely and only used for recipe suggestions.
+                AI features use the shared Gemini environment key configured for the app. No per-user key is needed.
               </p>
             </CardContent>
           </Card>

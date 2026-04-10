@@ -66,5 +66,9 @@
   .safe-bottom {
     padding-bottom: env(safe-area-inset-bottom);
   }
+
+  body.onboarding-active [data-bottom-nav="true"] {
+    display: none;
+  }
 }
 

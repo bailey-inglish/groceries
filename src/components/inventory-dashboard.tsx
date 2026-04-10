@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useCallback } from "react"
+import { useState, useEffect, useCallback, useMemo } from "react"
 import { useSearchParams } from "next/navigation"
 import Link from "next/link"
 import Image from "next/image"
@@ -18,7 +18,7 @@ import {
   SheetTitle,
   SheetFooter,
 } from "@/components/ui/sheet"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Select, SelectContent, SelectItem, SelectSeparator, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { useLocations } from "@/hooks/use-locations"
 import {
@@ -29,7 +29,6 @@ import {
   SortAsc,
   Minus,
   Trash2,
-  Clock,
   Pencil,
   Loader2,
   ToggleLeft,
@@ -75,27 +74,89 @@ interface EditForm {
   percentage: number
 }
 
+interface LocationSection {
+  slug: string
+  name: string
+  color: string
+  items: InventoryItem[]
+}
+
+function normalizeCategoryText(category?: string) {
+  return (category || "").toLowerCase().trim()
+}
+
+function getCategoryIconSlug(category?: string) {
+  const text = normalizeCategoryText(category)
+  const iconRules: Array<{ slug: string; keywords: string[] }> = [
+    { slug: "meat", keywords: ["meat", "beef", "pork", "chicken", "turkey", "lamb", "steak", "sausage", "bacon", "ham"] },
+    { slug: "dairy", keywords: ["dairy", "milk", "cheese", "yogurt", "cream", "butter", "custard"] },
+    { slug: "eggs", keywords: ["egg", "eggs"] },
+    { slug: "produce", keywords: ["fruit", "vegetable", "produce", "salad", "apple", "banana", "berry", "citrus", "potato", "tomato", "onion", "garlic"] },
+    { slug: "pasta", keywords: ["pasta", "noodle", "noodles", "spaghetti", "macaroni", "vermicelli"] },
+    { slug: "bakery", keywords: ["bread", "bakery", "cake", "pastry", "cookie", "biscuit", "bun"] },
+    { slug: "seafood", keywords: ["fish", "seafood", "salmon", "tuna", "shrimp", "crab", "prawn", "sardine"] },
+    { slug: "frozen", keywords: ["frozen"] },
+    { slug: "beverage", keywords: ["beverage", "drink", "juice", "soda", "water", "coffee", "tea"] },
+    { slug: "pantry", keywords: ["pantry", "canned", "sauce", "spice", "condiment", "grain", "rice", "beans", "cereal", "oil", "vinegar"] },
+  ]
+
+  for (const rule of iconRules) {
+    if (rule.keywords.some((keyword) => text.includes(keyword))) return rule.slug
+  }
+
+  return "other"
+}
+
+function groupItemsByLocation(items: InventoryItem[], locations: { slug: string; name: string; color: string }[]) {
+  const byLocation = new Map<string, InventoryItem[]>()
+  for (const item of items) {
+    const list = byLocation.get(item.location) || []
+    list.push(item)
+    byLocation.set(item.location, list)
+  }
+
+  const locationMap = new Map(locations.map((loc) => [loc.slug, loc]))
+  const orderedSlugs = [
+    ...locations.map((loc) => loc.slug),
+    ...Array.from(byLocation.keys()).filter((slug) => !locationMap.has(slug)),
+  ]
+
+  return orderedSlugs
+    .map((slug) => {
+      const location = locationMap.get(slug)
+      const sectionItems = byLocation.get(slug) || []
+      if (sectionItems.length === 0) return null
+
+      return {
+        slug,
+        name: location?.name || slug.replace(/_/g, " ").toLowerCase().replace(/\b\w/g, (c) => c.toUpperCase()),
+        color: location?.color || "bg-gray-100 text-gray-700",
+        items: sectionItems,
+      } satisfies LocationSection
+    })
+    .filter((section): section is LocationSection => !!section)
+}
+
 // ─── Item card ────────────────────────────────────────────────────────────────
 
 function ItemCard({
   item,
+  categoryIconSlug,
   onQuantityChange,
   onDelete,
   onEdit,
-  getColor,
-  getLabel,
 }: {
   item: InventoryItem
+  categoryIconSlug: string
   onQuantityChange: (id: string, delta: number) => void
   onDelete: (id: string) => void
   onEdit: (item: InventoryItem) => void
-  getColor: (slug: string) => string
-  getLabel: (slug: string) => string
 }) {
   const daysUntilExpiry = item.expirationDate
     ? Math.ceil((new Date(item.expirationDate).getTime() - Date.now()) / (1000 * 60 * 60 * 24))
     : null
   const isExpiringSoon = daysUntilExpiry !== null && daysUntilExpiry <= 7
+  const isRunningLow = item.packageSize && item.packageSize > 0 ? item.quantity / item.packageSize < 0.15 : item.quantity <= 1 && item.quantity > 0
 
   const fillPct =
     item.packageSize && item.packageSize > 0
@@ -104,27 +165,46 @@ function ItemCard({
 
   return (
     <Card
-      className={`border-0 shadow-sm ${isExpiringSoon ? "ring-1 ring-red-200" : ""}`}
+      className={`border-0 shadow-sm ${isExpiringSoon ? "ring-1 ring-red-200" : isRunningLow ? "ring-1 ring-amber-200" : ""}`}
       onClick={() => onEdit(item)}
       style={{ cursor: "pointer" }}
     >
       <CardContent className="p-4">
         <div className="flex items-start gap-3">
-          {item.imageUrl ? (
-            <div className="relative w-12 h-12 rounded-lg overflow-hidden shrink-0 bg-gray-100">
-              <Image src={item.imageUrl} alt={item.name} fill className="object-cover" sizes="48px" />
-            </div>
-          ) : (
-            <div className="w-12 h-12 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
-              <Package className="w-6 h-6 text-primary" />
-            </div>
-          )}
+          <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center shrink-0 overflow-hidden">
+            <Image
+              src={`/item-icons/${categoryIconSlug}.svg`}
+              alt=""
+              width={28}
+              height={28}
+              className="w-7 h-7"
+            />
+          </div>
 
           <div className="flex-1 min-w-0">
             <div className="flex items-start justify-between gap-2">
               <div className="min-w-0">
                 <h3 className="font-semibold text-sm truncate">{item.name}</h3>
                 {item.brand && <p className="text-xs text-muted-foreground">{item.brand}</p>}
+                <div className="flex flex-wrap items-center gap-1.5 mt-1.5">
+                  {item.category && (
+                    <Badge variant="outline" className="text-[10px] uppercase tracking-wide">
+                      {item.category.split(",")[0]}
+                    </Badge>
+                  )}
+                  {isExpiringSoon && (
+                    <Badge variant="destructive" className="text-[10px] gap-1">
+                      <AlertTriangle className="w-3 h-3" />
+                      {daysUntilExpiry !== null && daysUntilExpiry <= 0 ? "Expired" : "Expiring soon"}
+                    </Badge>
+                  )}
+                  {!isExpiringSoon && isRunningLow && (
+                    <Badge variant="outline" className="text-[10px] gap-1 border-amber-300 text-amber-700 bg-amber-50">
+                      <TrendingDown className="w-3 h-3" />
+                      Running low
+                    </Badge>
+                  )}
+                </div>
               </div>
               <div className="flex items-center gap-1 shrink-0">
                 <button
@@ -144,21 +224,9 @@ function ItemCard({
               </div>
             </div>
 
-            <div className="flex items-center gap-2 mt-2 flex-wrap">
-              <Badge className={`text-xs ${getColor(item.location)}`}>
-                {getLabel(item.location)}
-              </Badge>
-              {item.category && (
-                <Badge variant="outline" className="text-xs">{item.category.split(",")[0]}</Badge>
-              )}
+            <div className="flex items-center gap-2 mt-3 flex-wrap">
               {item.isOpened && (
                 <Badge variant="secondary" className="text-xs">Opened</Badge>
-              )}
-              {isExpiringSoon && daysUntilExpiry !== null && (
-                <Badge variant="destructive" className="text-xs flex items-center gap-1">
-                  <Clock className="w-3 h-3" />
-                  {daysUntilExpiry <= 0 ? "Expired" : `${daysUntilExpiry}d`}
-                </Badge>
               )}
             </div>
 
@@ -240,6 +308,18 @@ function EditSheet({
     percentage: 100,
   })
   const [saving, setSaving] = useState(false)
+  const [openedManuallyChanged, setOpenedManuallyChanged] = useState(false)
+
+  function inferOpened(quantity: string, packageSize: string, fallback = false) {
+    const parsedQuantity = Number.parseFloat(quantity)
+    const parsedPackageSize = Number.parseFloat(packageSize)
+    if (!Number.isFinite(parsedQuantity) || !Number.isFinite(parsedPackageSize) || parsedPackageSize <= 0) {
+      return fallback
+    }
+
+    const fullness = parsedQuantity / parsedPackageSize
+    return fullness < 0.99
+  }
 
   useEffect(() => {
     if (item) {
@@ -247,22 +327,33 @@ function EditSheet({
         item.packageSize && item.packageSize > 0
           ? Math.round((item.quantity / item.packageSize) * 100)
           : 100
+      const packageSize = item.packageSize ? String(item.packageSize) : ""
+      const quantity = String(item.quantity)
       setForm({
         name: item.name,
         brand: item.brand || "",
-        quantity: String(item.quantity),
+        quantity,
         unit: item.unit,
         location: item.location,
         expirationDate: item.expirationDate ? item.expirationDate.split("T")[0] : "",
         notes: item.notes || "",
-        packageSize: item.packageSize ? String(item.packageSize) : "",
+        packageSize,
         packageUnit: item.packageUnit || item.unit,
-        isOpened: item.isOpened || false,
+        isOpened: inferOpened(quantity, packageSize, item.isOpened || false),
         usePercentage: false,
         percentage: pct,
       })
+      setOpenedManuallyChanged(false)
     }
   }, [item])
+
+  useEffect(() => {
+    if (openedManuallyChanged) return
+    setForm((prev) => ({
+      ...prev,
+      isOpened: inferOpened(prev.quantity, prev.packageSize, prev.isOpened),
+    }))
+  }, [form.quantity, form.packageSize, openedManuallyChanged])
 
   function handlePercentageChange(pct: number) {
     const packageSize = parseFloat(form.packageSize)
@@ -289,7 +380,7 @@ function EditSheet({
         notes: form.notes || undefined,
         packageSize: form.packageSize ? parseFloat(form.packageSize) : undefined,
         packageUnit: form.packageUnit || undefined,
-        isOpened: form.isOpened,
+        isOpened: inferOpened(form.quantity, form.packageSize, form.isOpened),
       })
       onClose()
     } finally {
@@ -434,13 +525,19 @@ function EditSheet({
               <Label>Opened?</Label>
               <button
                 type="button"
-                onClick={() => setForm((prev) => ({ ...prev, isOpened: !prev.isOpened }))}
+                onClick={() => {
+                  setOpenedManuallyChanged(true)
+                  setForm((prev) => ({ ...prev, isOpened: !prev.isOpened }))
+                }}
                 className={`h-11 w-full rounded-lg border-2 text-sm font-medium transition-colors ${
                   form.isOpened ? "border-primary bg-primary/5 text-primary" : "border-input bg-background"
                 }`}
               >
                 {form.isOpened ? "✓ Opened" : "Not opened"}
               </button>
+              <p className="text-[11px] text-muted-foreground">
+                Automatically inferred from quantity on hand and package size.
+              </p>
             </div>
           </div>
 
@@ -477,6 +574,208 @@ function EditSheet({
   )
 }
 
+function LocationManagerSheet({
+  open,
+  onClose,
+  locations,
+  onSaved,
+}: {
+  open: boolean
+  onClose: () => void
+  locations: { id: string; name: string; slug: string; isDefault: boolean; isVisible: boolean }[]
+  onSaved: () => Promise<void>
+}) {
+  const [drafts, setDrafts] = useState<Record<string, { name: string; isVisible: boolean }>>({})
+  const [newLocationName, setNewLocationName] = useState("")
+  const [savingId, setSavingId] = useState<string | null>(null)
+  const [creating, setCreating] = useState(false)
+
+  useEffect(() => {
+    if (!open) return
+    const nextDrafts: Record<string, { name: string; isVisible: boolean }> = {}
+    for (const location of locations) {
+      nextDrafts[location.id] = {
+        name: location.name,
+        isVisible: location.isVisible,
+      }
+    }
+    setDrafts(nextDrafts)
+    setNewLocationName("")
+  }, [open, locations])
+
+  async function saveLocation(locationId: string) {
+    const draft = drafts[locationId]
+    if (!draft) return
+
+    setSavingId(locationId)
+    try {
+      const response = await fetch(`/api/locations/${locationId}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: draft.name.trim(),
+          isVisible: draft.isVisible,
+        }),
+      })
+      if (response.ok) {
+        await onSaved()
+      }
+    } finally {
+      setSavingId(null)
+    }
+  }
+
+  async function removeLocation(location: { id: string; name: string; isDefault: boolean }) {
+    if (!confirm(`${location.isDefault ? "Hide" : "Delete"} ${location.name}?`)) return
+
+    setSavingId(location.id)
+    try {
+      const response = await fetch(`/api/locations/${location.id}`, { method: "DELETE" })
+      if (response.ok) {
+        await onSaved()
+      }
+    } finally {
+      setSavingId(null)
+    }
+  }
+
+  async function addLocation() {
+    const name = newLocationName.trim()
+    if (!name) return
+
+    setCreating(true)
+    try {
+      const response = await fetch("/api/locations", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name }),
+      })
+      if (response.ok) {
+        setNewLocationName("")
+        await onSaved()
+      }
+    } finally {
+      setCreating(false)
+    }
+  }
+
+  return (
+    <Sheet open={open} onOpenChange={(o) => !o && onClose()}>
+      <SheetContent side="bottom">
+        <SheetHeader className="pt-2 pb-4">
+          <SheetTitle>Manage locations</SheetTitle>
+        </SheetHeader>
+
+        <div className="px-4 space-y-4 pb-2 max-h-[70vh] overflow-y-auto">
+          <p className="text-sm text-muted-foreground">
+            Rename, hide, or delete the tags used to organize your inventory.
+          </p>
+
+          <div className="space-y-3">
+            {locations.map((location) => {
+              const draft = drafts[location.id] || { name: location.name, isVisible: location.isVisible }
+              const isDirty = draft.name.trim() !== location.name || draft.isVisible !== location.isVisible
+
+              return (
+                <Card key={location.id} className="border-0 shadow-sm bg-secondary/30">
+                  <CardContent className="p-3 space-y-3">
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="flex-1 space-y-1.5">
+                        <Label className="text-[11px] uppercase tracking-wide text-muted-foreground">Name</Label>
+                        <Input
+                          value={draft.name}
+                          onChange={(e) =>
+                            setDrafts((prev) => ({
+                              ...prev,
+                              [location.id]: { ...draft, name: e.target.value },
+                            }))
+                          }
+                          className="h-10"
+                        />
+                      </div>
+                      <Badge variant="outline" className="shrink-0 mt-6">
+                        {location.isDefault ? "Default" : "Custom"}
+                      </Badge>
+                    </div>
+
+                    <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setDrafts((prev) => ({
+                            ...prev,
+                            [location.id]: { ...draft, isVisible: !draft.isVisible },
+                          }))
+                        }
+                        className={`flex items-center justify-center gap-2 h-10 px-3 rounded-lg border text-sm font-medium transition-colors ${
+                          draft.isVisible ? "border-primary bg-primary/5 text-primary" : "border-border bg-background"
+                        }`}
+                      >
+                        {draft.isVisible ? <ToggleRight className="w-4 h-4" /> : <ToggleLeft className="w-4 h-4" />}
+                        {draft.isVisible ? "Visible" : "Hidden"}
+                      </button>
+
+                      <div className="flex gap-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => removeLocation(location)}
+                          disabled={savingId === location.id}
+                          className="gap-1.5"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                          {location.isDefault ? "Hide" : "Delete"}
+                        </Button>
+                        <Button
+                          size="sm"
+                          onClick={() => saveLocation(location.id)}
+                          disabled={!isDirty || !draft.name.trim() || savingId === location.id}
+                          className="gap-1.5"
+                        >
+                          {savingId === location.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Pencil className="w-3.5 h-3.5" />}
+                          Save
+                        </Button>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              )
+            })}
+          </div>
+
+          <div className="space-y-2 pt-1">
+            <Label className="text-xs text-muted-foreground uppercase tracking-wide">Add location</Label>
+            <div className="flex gap-2">
+              <Input
+                value={newLocationName}
+                onChange={(e) => setNewLocationName(e.target.value)}
+                placeholder="Add a custom location"
+                className="h-11 flex-1"
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    e.preventDefault()
+                    addLocation()
+                  }
+                }}
+              />
+              <Button onClick={addLocation} disabled={!newLocationName.trim() || creating} className="h-11 gap-1.5">
+                {creating ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
+                Add
+              </Button>
+            </div>
+          </div>
+        </div>
+
+        <SheetFooter className="px-4 pt-4 pb-6">
+          <Button variant="outline" className="w-full" onClick={onClose}>
+            Done
+          </Button>
+        </SheetFooter>
+      </SheetContent>
+    </Sheet>
+  )
+}
+
 // ─── Dashboard ────────────────────────────────────────────────────────────────
 
 export function InventoryDashboard({
@@ -485,7 +784,7 @@ export function InventoryDashboard({
   userName: string
 }) {
   const searchParams = useSearchParams()
-  const { locations, loading: locLoading, getColor, getLabel } = useLocations()
+  const { locations, allLocations, loading: locLoading, refetch } = useLocations()
   const [items, setItems] = useState<InventoryItem[]>([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState("")
@@ -493,6 +792,7 @@ export function InventoryDashboard({
   const [sortBy, setSortBy] = useState("updatedAt")
   const [editItem, setEditItem] = useState<InventoryItem | null>(null)
   const [editOpen, setEditOpen] = useState(false)
+  const [manageLocationsOpen, setManageLocationsOpen] = useState(false)
 
   const userInitials = userName
     .split(" ")
@@ -557,17 +857,10 @@ export function InventoryDashboard({
     setEditOpen(true)
   }
 
-  // Compute stats from loaded items
-  const totalItems = items.length
-  const expiringItems = items.filter((i) => {
-    if (!i.expirationDate) return false
-    const days = Math.ceil((new Date(i.expirationDate).getTime() - Date.now()) / (1000 * 60 * 60 * 24))
-    return days <= 7
-  })
-  const lowItems = items.filter((i) => {
-    if (i.packageSize && i.packageSize > 0) return i.quantity / i.packageSize < 0.15
-    return i.quantity <= 1 && i.quantity > 0
-  })
+  const locationSections = useMemo(
+    () => groupItemsByLocation(items, allLocations.length > 0 ? allLocations : locations),
+    [items, allLocations, locations]
+  )
 
   const hour = new Date().getHours()
   const greeting = hour < 12 ? "Good morning" : hour < 17 ? "Good afternoon" : "Good evening"
@@ -605,16 +898,28 @@ export function InventoryDashboard({
 
         {/* Filter bar */}
         <div className="max-w-lg mx-auto px-4 pb-3 flex gap-2 overflow-x-auto scrollbar-none">
-          <Select value={locationFilter || "all"} onValueChange={(v) => setLocationFilter(v === "all" ? "" : v)}>
+          <Select
+            value={locationFilter || "all"}
+            onValueChange={(v) => {
+              if (v === "manage-locations") {
+                setManageLocationsOpen(true)
+                return
+              }
+              setLocationFilter(v === "all" ? "" : v)
+            }}
+          >
             <SelectTrigger className="h-8 text-xs w-auto gap-1 shrink-0">
               <Filter className="w-3 h-3" />
               <SelectValue placeholder="Location" />
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">All Locations</SelectItem>
+              <SelectSeparator />
               {locations.map((loc) => (
                 <SelectItem key={loc.slug} value={loc.slug}>{loc.name}</SelectItem>
               ))}
+              <SelectSeparator />
+              <SelectItem value="manage-locations">Edit locations…</SelectItem>
             </SelectContent>
           </Select>
 
@@ -634,73 +939,6 @@ export function InventoryDashboard({
       </div>
 
       <div className="max-w-lg mx-auto px-4 py-4 space-y-4">
-        {/* Stats row */}
-        {!loading && items.length > 0 && !search && !locationFilter && (
-          <div className="grid grid-cols-3 gap-2">
-            <Card className="border-0 shadow-sm">
-              <CardContent className="p-3 text-center">
-                <div className="text-xl font-bold text-primary">{totalItems}</div>
-                <div className="text-[10px] text-muted-foreground mt-0.5">Items</div>
-              </CardContent>
-            </Card>
-            <Card className={`border-0 shadow-sm ${expiringItems.length > 0 ? "bg-red-50" : ""}`}>
-              <CardContent className="p-3 text-center">
-                <div className={`text-xl font-bold ${expiringItems.length > 0 ? "text-red-600" : "text-foreground"}`}>
-                  {expiringItems.length}
-                </div>
-                <div className="text-[10px] text-muted-foreground mt-0.5">Expiring</div>
-              </CardContent>
-            </Card>
-            <Card className={`border-0 shadow-sm ${lowItems.length > 0 ? "bg-yellow-50" : ""}`}>
-              <CardContent className="p-3 text-center">
-                <div className={`text-xl font-bold ${lowItems.length > 0 ? "text-yellow-600" : "text-foreground"}`}>
-                  {lowItems.length}
-                </div>
-                <div className="text-[10px] text-muted-foreground mt-0.5">Running Low</div>
-              </CardContent>
-            </Card>
-          </div>
-        )}
-
-        {/* Alerts section */}
-        {!loading && !search && !locationFilter && (expiringItems.length > 0 || lowItems.length > 0) && (
-          <Card className="border-0 shadow-sm">
-            <CardContent className="px-4 py-3">
-              <div className="flex items-center gap-2 mb-2">
-                <AlertTriangle className="w-4 h-4 text-yellow-500" />
-                <span className="text-sm font-semibold">Heads up</span>
-              </div>
-              <div className="space-y-1">
-                {expiringItems.slice(0, 3).map((item) => {
-                  const days = Math.ceil((new Date(item.expirationDate!).getTime() - Date.now()) / (1000 * 60 * 60 * 24))
-                  return (
-                    <div key={item.id} className="flex items-center justify-between py-1">
-                      <div className="flex items-center gap-2">
-                        <Clock className="w-3.5 h-3.5 text-red-500 shrink-0" />
-                        <span className="text-sm truncate">{item.name}</span>
-                      </div>
-                      <Badge variant="destructive" className="text-xs shrink-0">
-                        {days <= 0 ? "Expired" : `${days}d`}
-                      </Badge>
-                    </div>
-                  )
-                })}
-                {lowItems.slice(0, 2).map((item) => (
-                  <div key={item.id} className="flex items-center justify-between py-1">
-                    <div className="flex items-center gap-2">
-                      <TrendingDown className="w-3.5 h-3.5 text-yellow-500 shrink-0" />
-                      <span className="text-sm truncate">{item.name}</span>
-                    </div>
-                    <Badge variant="outline" className="text-xs shrink-0 text-yellow-700 border-yellow-300">
-                      Low
-                    </Badge>
-                  </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
-        )}
-
         {/* Inventory list */}
         {loading || locLoading ? (
           Array.from({ length: 4 }).map((_, i) => (
@@ -734,20 +972,33 @@ export function InventoryDashboard({
             </Link>
           </div>
         ) : (
-          <>
-            <p className="text-xs text-muted-foreground px-1">{items.length} items — tap to edit</p>
-            {items.map((item) => (
-              <ItemCard
-                key={item.id}
-                item={item}
-                onQuantityChange={handleQuantityChange}
-                onDelete={handleDelete}
-                onEdit={handleEdit}
-                getColor={getColor}
-                getLabel={getLabel}
-              />
+          <div className="space-y-5">
+            <p className="text-xs text-muted-foreground px-1">{items.length} items — organized by location</p>
+            {locationSections.map((section) => (
+              <section key={section.slug} className="space-y-3">
+                <div className="flex items-center justify-between px-1">
+                  <div className="flex items-center gap-2">
+                    <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold ${section.color}`}>
+                      {section.name}
+                    </span>
+                    <span className="text-xs text-muted-foreground">{section.items.length}</span>
+                  </div>
+                </div>
+                <div className="space-y-3">
+                  {section.items.map((item) => (
+                    <ItemCard
+                      key={item.id}
+                      item={item}
+                      categoryIconSlug={getCategoryIconSlug(item.category)}
+                      onQuantityChange={handleQuantityChange}
+                      onDelete={handleDelete}
+                      onEdit={handleEdit}
+                    />
+                  ))}
+                </div>
+              </section>
             ))}
-          </>
+          </div>
         )}
       </div>
 
@@ -757,7 +1008,17 @@ export function InventoryDashboard({
         onClose={() => setEditOpen(false)}
         onSave={handleSave}
         onDelete={handleDelete}
-        locations={locations}
+        locations={allLocations}
+      />
+
+      <LocationManagerSheet
+        open={manageLocationsOpen}
+        onClose={() => setManageLocationsOpen(false)}
+        locations={allLocations}
+        onSaved={async () => {
+          await refetch()
+          await fetchItems()
+        }}
       />
     </div>
   )

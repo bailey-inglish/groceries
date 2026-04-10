@@ -32,17 +32,16 @@ export interface RecipeSuggestion {
   tags: string[]
 }
 
-const FREE_MODELS = new Set([
-  "gemini-2.5-flash-lite",
-  "gemini-2.5-flash",
-  "gemini-2.5-pro",
-])
+export type RecipeGenerationStatus = "success" | "need_more_ingredients" | "error" | "policy_violation"
 
-function getModel(): string {
-  const configured = process.env.GEMINI_MODEL?.trim()
-  if (configured && FREE_MODELS.has(configured)) return configured
-  return "gemini-2.5-flash-lite"
+export interface RecipeGenerationResult {
+  status: RecipeGenerationStatus
+  message: string
+  recipes: RecipeSuggestion[]
+  missingIngredients: string[]
 }
+
+const GEMINI_MODEL = "gemini-2.5-flash-lite"
 
 async function callGeminiWithRetry(url: string, body: object, attempts = 3): Promise<Response> {
   for (let i = 0; i < attempts; i++) {
@@ -67,28 +66,171 @@ async function callGeminiWithRetry(url: string, body: object, attempts = 3): Pro
   throw new Error("Gemini API failed after retries")
 }
 
+function toGenerationErrorMessage(error: unknown): string {
+  const message = error instanceof Error ? error.message : String(error)
+  if (
+    message.includes("RESOURCE_EXHAUSTED") ||
+    message.includes("prepayment credits are depleted") ||
+    message.includes("429")
+  ) {
+    return "Gemini credits are depleted or the model is rate-limited. Try again later or refresh billing in AI Studio."
+  }
+  return "Gemini could not generate meal ideas right now."
+}
+
+function normalizeRecipe(raw: Record<string, unknown>): RecipeSuggestion | null {
+  const title = typeof raw.title === "string" ? raw.title.trim() : ""
+  const description = typeof raw.description === "string" ? raw.description.trim() : ""
+  const instructions = Array.isArray(raw.instructions)
+    ? raw.instructions.filter((step): step is string => typeof step === "string" && step.trim().length > 0).join("\n")
+    : typeof raw.instructions === "string"
+      ? raw.instructions.trim()
+      : ""
+  const ingredientsRaw = Array.isArray(raw.ingredients) ? raw.ingredients : []
+  const ingredients = ingredientsRaw
+    .map((ing) => {
+      if (!ing || typeof ing !== "object") return null
+      const item = ing as Record<string, unknown>
+      const name = typeof item.name === "string" ? item.name.trim() : ""
+      const quantity = typeof item.quantity === "number" ? item.quantity : Number(item.quantity)
+      const unit = typeof item.unit === "string" ? item.unit.trim() : ""
+      if (!name || !Number.isFinite(quantity)) return null
+      return {
+        name,
+        amount: `${quantity} ${unit}`.trim(),
+      }
+    })
+    .filter((ing): ing is { name: string; amount: string } => !!ing)
+
+  const servings = typeof raw.servings === "number" && Number.isFinite(raw.servings) ? raw.servings : 4
+  const prepTimeMin = typeof raw.prepTimeMin === "number" && Number.isFinite(raw.prepTimeMin) ? raw.prepTimeMin : 0
+  const cookTimeMin = typeof raw.cookTimeMin === "number" && Number.isFinite(raw.cookTimeMin) ? raw.cookTimeMin : 0
+  const tags = Array.isArray(raw.tags)
+    ? raw.tags.filter((tag): tag is string => typeof tag === "string" && tag.trim().length > 0)
+    : []
+
+  if (!title || !instructions || ingredients.length === 0) return null
+
+  return {
+    title,
+    description,
+    ingredients,
+    instructions,
+    servings,
+    prepTimeMin,
+    cookTimeMin,
+    tags,
+  }
+}
+
+function normalizeRecipeResponse(raw: unknown): RecipeGenerationResult {
+  const fallback: RecipeGenerationResult = {
+    status: "error",
+    message: "Gemini returned an invalid response.",
+    recipes: [],
+    missingIngredients: [],
+  }
+
+  if (!raw || typeof raw !== "object") return fallback
+
+  const parsed = raw as Record<string, unknown>
+  const status =
+    parsed.status === "success" ||
+    parsed.status === "need_more_ingredients" ||
+    parsed.status === "error" ||
+    parsed.status === "policy_violation"
+      ? (parsed.status as RecipeGenerationStatus)
+      : "success"
+
+  const recipesRaw = Array.isArray(parsed.recipes) ? parsed.recipes : []
+  const recipes = recipesRaw
+    .map((recipe) => normalizeRecipe(recipe as Record<string, unknown>))
+    .filter((recipe): recipe is RecipeSuggestion => !!recipe)
+
+  const missingIngredients = Array.isArray(parsed.missingIngredients)
+    ? parsed.missingIngredients.filter((item): item is string => typeof item === "string" && item.trim().length > 0)
+    : []
+
+  const message = typeof parsed.message === "string" && parsed.message.trim().length > 0
+    ? parsed.message.trim()
+    : status === "success"
+      ? "Recipes generated successfully."
+      : status === "need_more_ingredients"
+        ? "You may need a few more ingredients before cooking this meal."
+        : status === "policy_violation"
+          ? "The request could not be completed because it conflicts with the model safety policy."
+          : "Something went wrong while generating recipes."
+
+  return {
+    status,
+    message,
+    recipes: status === "error" ? [] : recipes,
+    missingIngredients,
+  }
+}
+
 export async function generateRecipeSuggestions(
   params: RecipeSuggestionParams
-): Promise<RecipeSuggestion[]> {
-  const inventoryText = params.inventoryItems
-    .map((item) => {
-      let text = `- ${item.name}: ${item.quantity} ${item.unit} (${item.location})`
-      if (item.expirationDate) {
-        const daysUntilExpiry = Math.floor(
-          (item.expirationDate.getTime() - Date.now()) / (1000 * 60 * 60 * 24)
-        )
-        text += ` [expires in ${daysUntilExpiry} days]`
-      }
-      return text
-    })
-    .join("\n")
+): Promise<RecipeGenerationResult> {
+  try {
+    const inventoryText = params.inventoryItems
+      .map((item) => {
+        let text = `- ${item.name}: ${item.quantity} ${item.unit} (${item.location})`
+        if (item.expirationDate) {
+          const daysUntilExpiry = Math.floor(
+            (item.expirationDate.getTime() - Date.now()) / (1000 * 60 * 60 * 24)
+          )
+          text += ` [expires in ${daysUntilExpiry} days]`
+        }
+        return text
+      })
+      .join("\n")
 
-  const restrictions =
-    params.dietaryRestrictions.length > 0
-      ? params.dietaryRestrictions.join(", ")
-      : "none"
+    const restrictions =
+      params.dietaryRestrictions.length > 0
+        ? params.dietaryRestrictions.join(", ")
+        : "none"
 
-  const prompt = `You are a meal planning assistant. The user wants to make a meal using primarily what they already have in their pantry.
+    const prompt = `You are a meal planning assistant. The user wants to make a meal using primarily what they already have in their pantry.
+
+Return ONLY valid JSON matching this schema:
+{
+  "status": "success" | "need_more_ingredients" | "error" | "policy_violation",
+  "message": "short human-readable summary",
+  "missingIngredients": ["optional missing ingredients"],
+  "recipes": [
+    {
+      "title": "Recipe Name",
+      "description": "Brief 1-sentence description",
+      "ingredients": [
+        {"name": "ingredient name", "quantity": 1, "unit": "cup", "optional": false}
+      ],
+      "instructions": ["Step 1", "Step 2"],
+      "servings": 4,
+      "prepTimeMin": 15,
+      "cookTimeMin": 30,
+      "tags": ["tag1", "tag2"]
+    }
+  ]
+}
+
+Rules for status:
+- Use "success" when you can create one or more solid recipes.
+- Use "need_more_ingredients" when the pantry is close but at least one key ingredient is missing.
+- Use "policy_violation" when the request conflicts with dietary restrictions, safety, or policy.
+- Use "error" only if you cannot comply for a technical reason.
+
+Recipe rules:
+- Ingredients must be machine-readable objects with name, quantity, unit, and optional.
+- Instructions must be an ordered array of short, clear steps.
+- Keep titles concise.
+- Prefer ingredients already in the pantry.
+- Prioritize expiring items.
+- Respect the time limit strictly.
+
+If you return "need_more_ingredients", include recipes only if they are still useful and include a concise missingIngredients list.
+
+The user wants to make a meal using primarily what they already have in their pantry.
 
 Current Pantry (prioritize expiring soon items):
 ${inventoryText}
@@ -111,43 +253,44 @@ IMPORTANT RULES:
 4. Name each ingredient as a plain English ingredient name (not "2 cups of it"), matching pantry item names closely where possible.
 5. Respect the time constraint strictly — total prep+cook time must not exceed the limit.
 
-Return valid JSON only in this format:
-{
-  "recipes": [
-    {
-      "title": "Recipe Name",
-      "description": "Brief 1-sentence description",
-      "ingredients": [{"name": "ingredient", "amount": "amount with unit"}],
-      "instructions": "Step-by-step instructions",
-      "servings": 4,
-      "prepTimeMin": 15,
-      "cookTimeMin": 30,
-      "tags": ["tag1", "tag2"]
+`
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${encodeURIComponent(params.apiKey)}`
+
+    const res = await callGeminiWithRetry(url, {
+      contents: [{ parts: [{ text: prompt }] }],
+      generationConfig: {
+        responseMimeType: "application/json",
+        temperature: 0.6,
+        topP: 0.9,
+        maxOutputTokens: 1200,
+      },
+    })
+
+    const data = await res.json() as {
+      promptFeedback?: { blockReason?: string; blockReasonMessage?: string }
+      candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }>
     }
-  ]
-}`
 
-  const model = getModel()
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${encodeURIComponent(params.apiKey)}`
+    if (data.promptFeedback?.blockReason) {
+      return {
+        status: "policy_violation",
+        message: data.promptFeedback.blockReasonMessage || "The request was blocked by Gemini safety filters.",
+        recipes: [],
+        missingIngredients: [],
+      }
+    }
 
-  const res = await callGeminiWithRetry(url, {
-    contents: [{ parts: [{ text: prompt }] }],
-    generationConfig: {
-      responseMimeType: "application/json",
-      temperature: 0.6,
-      topP: 0.9,
-      maxOutputTokens: 1200,
-    },
-  })
+    const content = data.candidates?.[0]?.content?.parts?.[0]?.text
+    if (!content) throw new Error("No response from Gemini")
 
-  const data = await res.json() as {
-    candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }>
+    const parsed = JSON.parse(content)
+    return normalizeRecipeResponse(parsed)
+  } catch (error) {
+    return {
+      status: "error",
+      message: toGenerationErrorMessage(error),
+      recipes: [],
+      missingIngredients: [],
+    }
   }
-
-  const content = data.candidates?.[0]?.content?.parts?.[0]?.text
-  if (!content) throw new Error("No response from Gemini")
-
-  const parsed = JSON.parse(content)
-  const recipes = parsed.recipes || parsed
-  return Array.isArray(recipes) ? recipes : []
 }
