@@ -106,6 +106,8 @@ model InventoryItem {
   isOpened       Boolean            @default(false)
   openedAt       DateTime?
   upcGroupId     String?            // groups same-barcode items; populated on scan-in
+  // Refill preference captured when item is deleted or scanned out
+  refillWanted   Boolean?           // null = never asked; true = user wants refill; false = user doesn't
   createdAt      DateTime           @default(now())
   updatedAt      DateTime           @updatedAt
 
@@ -173,6 +175,10 @@ model ShoppingListItem {
   isPurchased         Boolean        @default(false)
   predictedRunOutDate DateTime?
   fromMealPlan        Boolean        @default(false)
+  // Why this item is on the list
+  reason              String?        // PREDICTED_LOW | EXPIRING_SOON | MANUAL | MEAL_PLAN | REFILL_REQUESTED
+  reasonDetail        String?        // human-readable detail, e.g. "~2.3 days remaining"
+  barcode             String?        // links to a UPC so scan-in can auto-mark purchased
   createdAt           DateTime       @default(now())
 
   user                User           @relation(fields: [userId], references: [id], onDelete: Cascade)

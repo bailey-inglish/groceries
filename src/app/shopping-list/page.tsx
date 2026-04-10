@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef, useCallback } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Card, CardContent } from "@/components/ui/card"
@@ -13,7 +13,12 @@ import {
   Trash2,
   RefreshCw,
   Loader2,
-  Calendar,
+  TrendingDown,
+  AlertTriangle,
+  Clock,
+  ChefHat,
+  RotateCcw,
+  Search,
 } from "lucide-react"
 
 interface ShoppingItem {
@@ -23,7 +28,55 @@ interface ShoppingItem {
   unit: string
   isPurchased: boolean
   predictedRunOutDate?: string
+  reason?: string | null
+  reasonDetail?: string | null
+  barcode?: string | null
   inventoryItem?: { name: string; location: string } | null
+}
+
+interface SearchSuggestion {
+  name: string
+  brand?: string | null
+  barcode?: string | null
+  unit: string
+  currentQuantity: number
+}
+
+function ReasonLabel({ reason, reasonDetail }: { reason?: string | null; reasonDetail?: string | null }) {
+  if (!reason || reason === "MANUAL") return null
+
+  const config: Record<string, { icon: React.ReactNode; color: string; label: string }> = {
+    PREDICTED_LOW: {
+      icon: <TrendingDown className="w-3 h-3" />,
+      color: "text-amber-700",
+      label: reasonDetail || "Running low",
+    },
+    EXPIRING_SOON: {
+      icon: <AlertTriangle className="w-3 h-3" />,
+      color: "text-red-600",
+      label: reasonDetail || "Expiring soon",
+    },
+    MEAL_PLAN: {
+      icon: <ChefHat className="w-3 h-3" />,
+      color: "text-blue-600",
+      label: reasonDetail || "For meal plan",
+    },
+    REFILL_REQUESTED: {
+      icon: <RotateCcw className="w-3 h-3" />,
+      color: "text-green-700",
+      label: reasonDetail || "Refill requested",
+    },
+  }
+
+  const c = config[reason]
+  if (!c) return null
+
+  return (
+    <span className={`flex items-center gap-1 text-xs ${c.color}`}>
+      {c.icon}
+      {c.label}
+    </span>
+  )
 }
 
 export default function ShoppingListPage() {
@@ -32,6 +85,11 @@ export default function ShoppingListPage() {
   const [refreshing, setRefreshing] = useState(false)
   const [newItemName, setNewItemName] = useState("")
   const [adding, setAdding] = useState(false)
+  const [searchResults, setSearchResults] = useState<SearchSuggestion[]>([])
+  const [searchOpen, setSearchOpen] = useState(false)
+  const [selectedSuggestion, setSelectedSuggestion] = useState<SearchSuggestion | null>(null)
+  const searchRef = useRef<HTMLDivElement>(null)
+  const searchDebounce = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   async function fetchItems() {
     const res = await fetch("/api/shopping-list")
@@ -43,6 +101,47 @@ export default function ShoppingListPage() {
   useEffect(() => {
     fetchItems()
   }, [])
+
+  // Close autocomplete when clicking outside
+  useEffect(() => {
+    function onClickOutside(e: MouseEvent) {
+      if (searchRef.current && !searchRef.current.contains(e.target as Node)) {
+        setSearchOpen(false)
+      }
+    }
+    document.addEventListener("mousedown", onClickOutside)
+    return () => document.removeEventListener("mousedown", onClickOutside)
+  }, [])
+
+  const handleSearchInput = useCallback((value: string) => {
+    setNewItemName(value)
+    setSelectedSuggestion(null)
+
+    if (searchDebounce.current) clearTimeout(searchDebounce.current)
+
+    if (value.trim().length < 2) {
+      setSearchResults([])
+      setSearchOpen(false)
+      return
+    }
+
+    searchDebounce.current = setTimeout(async () => {
+      try {
+        const res = await fetch(`/api/shopping-list/search?q=${encodeURIComponent(value.trim())}`)
+        const data = await res.json()
+        setSearchResults(data.results || [])
+        setSearchOpen((data.results || []).length > 0)
+      } catch {
+        setSearchResults([])
+      }
+    }, 250)
+  }, [])
+
+  function selectSuggestion(suggestion: SearchSuggestion) {
+    setSelectedSuggestion(suggestion)
+    setNewItemName(suggestion.name)
+    setSearchOpen(false)
+  }
 
   async function handleAutoPopulate() {
     setRefreshing(true)
@@ -65,14 +164,30 @@ export default function ShoppingListPage() {
 
     setAdding(true)
     try {
+      const payload = selectedSuggestion
+        ? {
+            name: selectedSuggestion.name,
+            quantity: 1,
+            unit: selectedSuggestion.unit,
+            barcode: selectedSuggestion.barcode,
+            reason: "MANUAL",
+          }
+        : {
+            name: newItemName.trim(),
+            quantity: 1,
+            reason: "MANUAL",
+          }
+
       const res = await fetch("/api/shopping-list", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name: newItemName.trim(), quantity: 1 }),
+        body: JSON.stringify(payload),
       })
       const data = await res.json()
       setItems((prev) => [data.item, ...prev])
       setNewItemName("")
+      setSelectedSuggestion(null)
+      setSearchResults([])
     } finally {
       setAdding(false)
     }
@@ -144,17 +259,67 @@ export default function ShoppingListPage() {
             </div>
           </div>
 
-          <form onSubmit={handleAddItem} className="flex gap-2">
-            <Input
-              placeholder="Add item..."
-              value={newItemName}
-              onChange={(e) => setNewItemName(e.target.value)}
-              className="flex-1 h-10"
-            />
-            <Button type="submit" size="sm" disabled={!newItemName.trim() || adding} className="gap-1">
-              {adding ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
-            </Button>
-          </form>
+          {/* Smart search + add form */}
+          <div ref={searchRef} className="relative">
+            <form onSubmit={handleAddItem} className="flex gap-2">
+              <div className="relative flex-1">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" />
+                <Input
+                  placeholder="Search or add item..."
+                  value={newItemName}
+                  onChange={(e) => handleSearchInput(e.target.value)}
+                  onFocus={() => searchResults.length > 0 && setSearchOpen(true)}
+                  className="pl-9 h-10"
+                  autoComplete="off"
+                />
+              </div>
+              <Button type="submit" size="sm" disabled={!newItemName.trim() || adding} className="gap-1 h-10 px-3">
+                {adding ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
+              </Button>
+            </form>
+
+            {/* Autocomplete dropdown */}
+            {searchOpen && searchResults.length > 0 && (
+              <div className="absolute top-full left-0 right-0 mt-1 bg-white border rounded-lg shadow-lg z-50 overflow-hidden">
+                {searchResults.map((suggestion, i) => (
+                  <button
+                    key={i}
+                    type="button"
+                    onMouseDown={(e) => { e.preventDefault(); selectSuggestion(suggestion) }}
+                    className="w-full flex items-center justify-between px-4 py-3 hover:bg-gray-50 text-left border-b last:border-0 transition-colors"
+                  >
+                    <div className="min-w-0">
+                      <p className="text-sm font-medium truncate">{suggestion.name}</p>
+                      {suggestion.brand && (
+                        <p className="text-xs text-muted-foreground">{suggestion.brand}</p>
+                      )}
+                    </div>
+                    <div className="flex flex-col items-end shrink-0 ml-2 gap-0.5">
+                      {suggestion.currentQuantity > 0 ? (
+                        <Badge variant="outline" className="text-[10px] h-4 text-green-700 border-green-300">
+                          {suggestion.currentQuantity} on hand
+                        </Badge>
+                      ) : (
+                        <Badge variant="outline" className="text-[10px] h-4 text-muted-foreground">
+                          out of stock
+                        </Badge>
+                      )}
+                      {suggestion.barcode && (
+                        <span className="text-[9px] text-muted-foreground/60">UPC linked</span>
+                      )}
+                    </div>
+                  </button>
+                ))}
+                <button
+                  type="button"
+                  onMouseDown={(e) => { e.preventDefault(); setSearchOpen(false) }}
+                  className="w-full px-4 py-2.5 text-xs text-muted-foreground hover:bg-gray-50 text-left border-t"
+                >
+                  Add &quot;{newItemName}&quot; as a custom item →
+                </button>
+              </div>
+            )}
+          </div>
         </div>
       </div>
 
@@ -176,11 +341,11 @@ export default function ShoppingListPage() {
             <ShoppingCart className="w-16 h-16 text-muted-foreground/30 mx-auto mb-4" />
             <h3 className="font-semibold text-lg mb-1">Your list is empty</h3>
             <p className="text-sm text-muted-foreground mb-6">
-              Add items manually or auto-populate from your inventory
+              Add items manually or let us check your inventory
             </p>
             <Button onClick={handleAutoPopulate} disabled={refreshing} className="gap-2">
               {refreshing ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
-              Auto-populate from inventory
+              Check inventory
             </Button>
           </div>
         ) : (
@@ -198,12 +363,12 @@ export default function ShoppingListPage() {
                 {pendingItems.map((item) => (
                   <Card key={item.id} className="border-0 shadow-sm">
                     <CardContent className="p-4">
-                      <div className="flex items-center gap-3">
+                      <div className="flex items-start gap-3">
                         <Checkbox
                           id={item.id}
                           checked={item.isPurchased}
                           onCheckedChange={() => togglePurchased(item.id, item.isPurchased)}
-                          className="w-5 h-5 shrink-0"
+                          className="w-5 h-5 shrink-0 mt-0.5"
                         />
                         <div className="flex-1 min-w-0">
                           <label
@@ -212,20 +377,18 @@ export default function ShoppingListPage() {
                           >
                             {item.name}
                           </label>
-                          <div className="flex items-center gap-2 mt-0.5">
+                          <div className="flex flex-wrap items-center gap-x-2 gap-y-1 mt-1">
                             <span className="text-xs text-muted-foreground">
                               {item.quantity} {item.unit}
                             </span>
-                            {item.predictedRunOutDate && (
-                              <Badge variant="outline" className="text-xs flex items-center gap-1 h-4">
-                                <Calendar className="w-2.5 h-2.5" />
-                                {new Date(item.predictedRunOutDate).toLocaleDateString()}
-                              </Badge>
+                            {item.reason && item.reason !== "MANUAL" && (
+                              <ReasonLabel reason={item.reason} reasonDetail={item.reasonDetail} />
                             )}
-                            {item.inventoryItem && (
-                              <Badge variant="secondary" className="text-xs h-4">
-                                {item.inventoryItem.location.toLowerCase().replace("_", " ")}
-                              </Badge>
+                            {item.inventoryItem && !item.reason && (
+                              <span className="flex items-center gap-1 text-xs text-muted-foreground">
+                                <Clock className="w-3 h-3" />
+                                {item.inventoryItem.location.toLowerCase().replace(/_/g, " ")}
+                              </span>
                             )}
                           </div>
                         </div>
@@ -253,13 +416,13 @@ export default function ShoppingListPage() {
                     <CardContent className="p-4">
                       <div className="flex items-center gap-3">
                         <Checkbox
-                          id={item.id}
+                          id={`purchased-${item.id}`}
                           checked={true}
                           onCheckedChange={() => togglePurchased(item.id, item.isPurchased)}
                           className="w-5 h-5 shrink-0"
                         />
                         <label
-                          htmlFor={item.id}
+                          htmlFor={`purchased-${item.id}`}
                           className="text-sm font-medium cursor-pointer line-through flex-1"
                         >
                           {item.name}

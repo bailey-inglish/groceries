@@ -265,21 +265,38 @@ function RecipeCard({
   async function handleSave() {
     setSaving(true)
     try {
-      await fetch("/api/recipes", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          title: recipe.title,
-          description: recipe.description,
-          ingredients: recipe.ingredients,
-          instructions: recipe.instructions,
-          servings: recipe.servings,
-          prepTimeMin: recipe.prepTimeMin,
-          cookTimeMin: recipe.cookTimeMin,
-          tags: recipe.tags,
-          source: "AI",
-        }),
-      })
+      // Try to find the AI_CACHE copy and promote it to AI (saved recipe)
+      const searchRes = await fetch("/api/recipes?source=AI_CACHE")
+      const searchData = await searchRes.json()
+      const cached = (searchData.recipes || []).find(
+        (r: { id: string; title: string }) => r.title === recipe.title
+      )
+
+      if (cached) {
+        // Promote: AI_CACHE → AI
+        await fetch(`/api/recipes/${cached.id}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ source: "AI" }),
+        })
+      } else {
+        // Fallback: create a new saved record
+        await fetch("/api/recipes", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            title: recipe.title,
+            description: recipe.description,
+            ingredients: recipe.ingredients,
+            instructions: recipe.instructions,
+            servings: recipe.servings,
+            prepTimeMin: recipe.prepTimeMin,
+            cookTimeMin: recipe.cookTimeMin,
+            tags: recipe.tags,
+            source: "AI",
+          }),
+        })
+      }
       setSaved(true)
     } finally {
       setSaving(false)
@@ -607,6 +624,47 @@ export default function MealPage() {
       }
 
       setPhase("results")
+
+      // ── Persist suggestions to AI_CACHE (fire-and-forget) ────────────────
+      if (recipes.length > 0) {
+        // Save new suggestions
+        await Promise.allSettled(
+          recipes.map((recipe) =>
+            fetch("/api/recipes", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                title: recipe.title,
+                description: recipe.description,
+                ingredients: recipe.ingredients,
+                instructions: recipe.instructions,
+                servings: recipe.servings,
+                prepTimeMin: recipe.prepTimeMin,
+                cookTimeMin: recipe.cookTimeMin,
+                tags: recipe.tags,
+                source: "AI_CACHE",
+              }),
+            })
+          )
+        )
+
+        // Enforce 10-item cache limit: fetch all AI_CACHE recipes, delete oldest
+        try {
+          const cacheRes = await fetch("/api/recipes?source=AI_CACHE")
+          const cacheData = await cacheRes.json()
+          const cached: Array<{ id: string; createdAt: string }> = cacheData.recipes || []
+          if (cached.length > 10) {
+            const toDelete = cached
+              .sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime())
+              .slice(0, cached.length - 10)
+            await Promise.allSettled(
+              toDelete.map((r) => fetch(`/api/recipes/${r.id}`, { method: "DELETE" }))
+            )
+          }
+        } catch {
+          // Cache cleanup failure is non-critical
+        }
+      }
     } catch {
       setError("Something went wrong. Check your connection and try again.")
       setPhase("setup")

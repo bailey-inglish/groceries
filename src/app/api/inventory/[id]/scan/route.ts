@@ -52,5 +52,30 @@ export async function POST(
     data: { quantity: newQuantity },
   })
 
-  return NextResponse.json({ item: updated })
+  // ── SCAN_IN: auto-mark matching shopping list items as purchased ──────────
+  let purchasedListItemIds: string[] = []
+  if (eventType === "SCAN_IN") {
+    const candidates = await prisma.shoppingListItem.findMany({
+      where: {
+        userId: session.user.id,
+        isPurchased: false,
+        OR: [
+          // Match by barcode if both have one
+          ...(item.barcode ? [{ barcode: item.barcode }] : []),
+          // Fuzzy name match
+          { name: { contains: item.name, mode: "insensitive" as const } },
+        ],
+      },
+    })
+
+    if (candidates.length > 0) {
+      purchasedListItemIds = candidates.map((c) => c.id)
+      await prisma.shoppingListItem.updateMany({
+        where: { id: { in: purchasedListItemIds } },
+        data: { isPurchased: true },
+      })
+    }
+  }
+
+  return NextResponse.json({ item: updated, purchasedListItemIds })
 }

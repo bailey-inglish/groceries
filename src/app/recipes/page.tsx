@@ -1,14 +1,14 @@
 "use client"
 
 import { useState, useEffect } from "react"
+import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Badge } from "@/components/ui/badge"
 import { Skeleton } from "@/components/ui/skeleton"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Textarea } from "@/components/ui/textarea"
 import {
   ChefHat,
@@ -20,6 +20,7 @@ import {
   Save,
   Loader2,
   X,
+  Check,
 } from "lucide-react"
 
 interface Recipe {
@@ -36,150 +37,43 @@ interface Recipe {
   createdAt: string
 }
 
-interface AISuggestion {
-  title: string
-  description: string
-  ingredients: Array<{ name: string; amount: string }>
-  instructions: string
-  servings: number
-  prepTimeMin: number
-  cookTimeMin: number
-  tags: string[]
-}
+type Ingredient = { name: string; amount: string; inPantry?: boolean; pantryItemName?: string }
 
-function RecipeCard({ recipe, onSave }: { recipe: AISuggestion; onSave?: () => void }) {
+function RecipeExpandable({ recipe, children }: { recipe: Recipe; children?: React.ReactNode }) {
   const [expanded, setExpanded] = useState(false)
-  const [saving, setSaving] = useState(false)
-  const [saved, setSaved] = useState(false)
-
-  async function handleSave() {
-    setSaving(true)
-    try {
-      await fetch("/api/recipes", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          title: recipe.title,
-          description: recipe.description,
-          ingredients: recipe.ingredients,
-          instructions: recipe.instructions,
-          servings: recipe.servings,
-          prepTimeMin: recipe.prepTimeMin,
-          cookTimeMin: recipe.cookTimeMin,
-          tags: recipe.tags,
-          source: "AI",
-        }),
-      })
-      setSaved(true)
-      onSave?.()
-    } finally {
-      setSaving(false)
-    }
-  }
+  const ingredients: Ingredient[] = (() => {
+    try { return JSON.parse(recipe.ingredients || "[]") } catch { return [] }
+  })()
+  const tags: string[] = (() => {
+    try { return JSON.parse(recipe.tags || "[]") } catch { return [] }
+  })()
+  const totalTime = recipe.prepTimeMin + recipe.cookTimeMin
 
   return (
     <Card className="border-0 shadow-sm">
       <CardContent className="p-4">
         <div className="flex items-start justify-between gap-2">
           <div className="flex-1 min-w-0">
-            <h3 className="font-semibold text-base">{recipe.title}</h3>
-            {recipe.description && (
-              <p className="text-sm text-muted-foreground mt-1 line-clamp-2">{recipe.description}</p>
-            )}
-          </div>
-          {!saved ? (
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={handleSave}
-              disabled={saving}
-              className="shrink-0 gap-1"
-            >
-              {saving ? <Loader2 className="w-3 h-3 animate-spin" /> : <Save className="w-3 h-3" />}
-              Save
-            </Button>
-          ) : (
-            <Badge variant="success">Saved</Badge>
-          )}
-        </div>
-
-        <div className="flex items-center gap-4 mt-3 text-xs text-muted-foreground">
-          <span className="flex items-center gap-1">
-            <Clock className="w-3 h-3" />
-            {recipe.prepTimeMin + recipe.cookTimeMin}m
-          </span>
-          <span className="flex items-center gap-1">
-            <Users className="w-3 h-3" />
-            {recipe.servings} servings
-          </span>
-        </div>
-
-        {recipe.tags.length > 0 && (
-          <div className="flex flex-wrap gap-1 mt-2">
-            {recipe.tags.map((tag) => (
-              <Badge key={tag} variant="secondary" className="text-xs">{tag}</Badge>
-            ))}
-          </div>
-        )}
-
-        <button
-          onClick={() => setExpanded(!expanded)}
-          className="text-xs text-primary mt-3 hover:underline"
-        >
-          {expanded ? "Show less" : "View recipe →"}
-        </button>
-
-        {expanded && (
-          <div className="mt-4 space-y-3">
-            <div>
-              <h4 className="text-sm font-semibold mb-2">Ingredients</h4>
-              <ul className="space-y-1">
-                {recipe.ingredients.map((ing, i) => (
-                  <li key={i} className="text-sm flex items-start gap-2">
-                    <span className="text-muted-foreground shrink-0">•</span>
-                    <span><strong>{ing.amount}</strong> {ing.name}</span>
-                  </li>
-                ))}
-              </ul>
-            </div>
-            <div>
-              <h4 className="text-sm font-semibold mb-2">Instructions</h4>
-              <p className="text-sm text-muted-foreground whitespace-pre-wrap">{recipe.instructions}</p>
-            </div>
-          </div>
-        )}
-      </CardContent>
-    </Card>
-  )
-}
-
-function SavedRecipeCard({ recipe }: { recipe: Recipe }) {
-  const [expanded, setExpanded] = useState(false)
-  const ingredients: AISuggestion["ingredients"] = JSON.parse(recipe.ingredients || "[]")
-  const tags: string[] = JSON.parse(recipe.tags || "[]")
-
-  return (
-    <Card className="border-0 shadow-sm">
-      <CardContent className="p-4">
-        <div className="flex items-start justify-between gap-2">
-          <div className="flex-1 min-w-0">
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 flex-wrap">
               <h3 className="font-semibold text-base truncate">{recipe.title}</h3>
               {recipe.source === "AI" && (
-                <Badge className="bg-purple-100 text-purple-700 text-xs shrink-0">AI</Badge>
+                <Badge className="bg-purple-100 text-purple-700 text-[10px] shrink-0">AI</Badge>
               )}
             </div>
             {recipe.description && (
               <p className="text-sm text-muted-foreground mt-1 line-clamp-2">{recipe.description}</p>
             )}
           </div>
+          {children}
         </div>
 
         <div className="flex items-center gap-4 mt-3 text-xs text-muted-foreground">
-          <span className="flex items-center gap-1">
-            <Clock className="w-3 h-3" />
-            {recipe.prepTimeMin + recipe.cookTimeMin}m
-          </span>
+          {totalTime > 0 && (
+            <span className="flex items-center gap-1">
+              <Clock className="w-3 h-3" />
+              {totalTime}m
+            </span>
+          )}
           <span className="flex items-center gap-1">
             <Users className="w-3 h-3" />
             {recipe.servings} servings
@@ -202,13 +96,19 @@ function SavedRecipeCard({ recipe }: { recipe: Recipe }) {
         </button>
 
         {expanded && (
-          <div className="mt-4 space-y-3">
+          <div className="mt-4 space-y-3 border-t pt-3">
             <div>
               <h4 className="text-sm font-semibold mb-2">Ingredients</h4>
               <ul className="space-y-1">
                 {ingredients.map((ing, i) => (
                   <li key={i} className="text-sm flex items-start gap-2">
-                    <span className="text-muted-foreground shrink-0">•</span>
+                    {ing.inPantry !== undefined ? (
+                      ing.inPantry
+                        ? <Check className="w-3 h-3 text-green-500 mt-0.5 shrink-0" />
+                        : <X className="w-3 h-3 text-red-400 mt-0.5 shrink-0" />
+                    ) : (
+                      <span className="text-muted-foreground shrink-0">•</span>
+                    )}
                     <span><strong>{ing.amount}</strong> {ing.name}</span>
                   </li>
                 ))}
@@ -222,6 +122,48 @@ function SavedRecipeCard({ recipe }: { recipe: Recipe }) {
         )}
       </CardContent>
     </Card>
+  )
+}
+
+function CachedRecipeCard({ recipe, onSaved }: { recipe: Recipe; onSaved: () => void }) {
+  const [saving, setSaving] = useState(false)
+  const [saved, setSaved] = useState(false)
+
+  async function handleSave() {
+    setSaving(true)
+    try {
+      await fetch(`/api/recipes/${recipe.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ source: "AI" }),
+      })
+      setSaved(true)
+      onSaved()
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <RecipeExpandable recipe={recipe}>
+      {!saved ? (
+        <Button
+          size="sm"
+          variant="outline"
+          onClick={handleSave}
+          disabled={saving}
+          className="shrink-0 gap-1"
+        >
+          {saving ? <Loader2 className="w-3 h-3 animate-spin" /> : <Save className="w-3 h-3" />}
+          Save
+        </Button>
+      ) : (
+        <Badge className="bg-green-100 text-green-700 text-xs shrink-0">
+          <Check className="w-3 h-3 mr-1" />
+          Saved
+        </Badge>
+      )}
+    </RecipeExpandable>
   )
 }
 
@@ -384,58 +326,32 @@ function AddRecipeForm({ onSuccess }: { onSuccess: () => void }) {
 }
 
 export default function RecipesPage() {
-  const [recipes, setRecipes] = useState<Recipe[]>([])
-  const [loading, setLoading] = useState(true)
-  const [suggestions, setSuggestions] = useState<AISuggestion[]>([])
-  const [aiLoading, setAiLoading] = useState(false)
-  const [aiError, setAiError] = useState("")
+  const [myRecipes, setMyRecipes] = useState<Recipe[]>([])
+  const [cachedRecipes, setCachedRecipes] = useState<Recipe[]>([])
+  const [myLoading, setMyLoading] = useState(true)
+  const [cacheLoading, setCacheLoading] = useState(true)
   const [showAddForm, setShowAddForm] = useState(false)
-  const [aiForm, setAiForm] = useState({
-    timeOfDay: "dinner",
-    numPeople: "2",
-    additionalPreferences: "",
-  })
 
-  async function fetchRecipes() {
-    setLoading(true)
-    const res = await fetch("/api/recipes")
+  async function fetchMyRecipes() {
+    setMyLoading(true)
+    const res = await fetch("/api/recipes?excludeSource=AI_CACHE")
     const data = await res.json()
-    setRecipes(data.recipes || [])
-    setLoading(false)
+    setMyRecipes(data.recipes || [])
+    setMyLoading(false)
+  }
+
+  async function fetchCachedRecipes() {
+    setCacheLoading(true)
+    const res = await fetch("/api/recipes?source=AI_CACHE")
+    const data = await res.json()
+    setCachedRecipes(data.recipes || [])
+    setCacheLoading(false)
   }
 
   useEffect(() => {
-    fetchRecipes()
+    fetchMyRecipes()
+    fetchCachedRecipes()
   }, [])
-
-  async function generateSuggestions() {
-    setAiLoading(true)
-    setAiError("")
-    setSuggestions([])
-
-    try {
-      const res = await fetch("/api/recipes/suggest", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          timeOfDay: aiForm.timeOfDay,
-          numPeople: parseInt(aiForm.numPeople),
-          additionalPreferences: aiForm.additionalPreferences,
-        }),
-      })
-
-      const data = await res.json()
-      if (!res.ok) {
-        setAiError(data.error || "Failed to generate suggestions")
-        return
-      }
-      setSuggestions(data.suggestions || [])
-    } catch {
-      setAiError("Failed to connect to AI service")
-    } finally {
-      setAiLoading(false)
-    }
-  }
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -461,7 +377,7 @@ export default function RecipesPage() {
               <CardTitle className="text-base">New Recipe</CardTitle>
             </CardHeader>
             <CardContent className="px-4 pb-4">
-              <AddRecipeForm onSuccess={() => { setShowAddForm(false); fetchRecipes() }} />
+              <AddRecipeForm onSuccess={() => { setShowAddForm(false); fetchMyRecipes() }} />
             </CardContent>
           </Card>
         )}
@@ -472,14 +388,15 @@ export default function RecipesPage() {
               <BookOpen className="w-4 h-4" />
               My Recipes
             </TabsTrigger>
-            <TabsTrigger value="ai-suggestions" className="flex-1 gap-1.5">
+            <TabsTrigger value="recent-ai" className="flex-1 gap-1.5">
               <Sparkles className="w-4 h-4" />
-              AI Suggestions
+              Recently Suggested
             </TabsTrigger>
           </TabsList>
 
+          {/* My Recipes */}
           <TabsContent value="my-recipes" className="space-y-3">
-            {loading ? (
+            {myLoading ? (
               Array.from({ length: 3 }).map((_, i) => (
                 <Card key={i} className="border-0 shadow-sm">
                   <CardContent className="p-4 space-y-2">
@@ -489,108 +406,87 @@ export default function RecipesPage() {
                   </CardContent>
                 </Card>
               ))
-            ) : recipes.length === 0 ? (
+            ) : myRecipes.length === 0 ? (
               <div className="text-center py-12">
                 <ChefHat className="w-14 h-14 text-muted-foreground/30 mx-auto mb-3" />
-                <h3 className="font-semibold mb-1">No recipes yet</h3>
+                <h3 className="font-semibold mb-1">No saved recipes yet</h3>
                 <p className="text-sm text-muted-foreground mb-4">
-                  Add your own recipes or generate AI suggestions
+                  Add your own or save ideas from the AI suggestions below
                 </p>
-                <Button size="sm" onClick={() => setShowAddForm(true)}>Add Recipe</Button>
+                <div className="flex gap-2 justify-center flex-wrap">
+                  <Button size="sm" onClick={() => setShowAddForm(true)}>Add Recipe</Button>
+                  <Link href="/meal">
+                    <Button size="sm" variant="outline" className="gap-1.5">
+                      <Sparkles className="w-3.5 h-3.5" />
+                      Get AI ideas
+                    </Button>
+                  </Link>
+                </div>
               </div>
             ) : (
-              recipes.map((recipe) => <SavedRecipeCard key={recipe.id} recipe={recipe} />)
+              myRecipes.map((recipe) => (
+                <RecipeExpandable key={recipe.id} recipe={recipe} />
+              ))
             )}
           </TabsContent>
 
-          <TabsContent value="ai-suggestions" className="space-y-4">
-            <Card className="border-0 shadow-sm">
-              <CardHeader className="pb-2 pt-4 px-4">
-                <CardTitle className="text-base flex items-center gap-2">
-                  <Sparkles className="w-4 h-4 text-purple-500" />
-                  Generate Meal Ideas
-                </CardTitle>
-                <CardDescription className="text-xs">
-                  AI will suggest recipes based on your current inventory
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="px-4 pb-4 space-y-3">
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="space-y-1.5">
-                    <Label className="text-xs">Time of Day</Label>
-                    <Select
-                      value={aiForm.timeOfDay}
-                      onValueChange={(v) => setAiForm({ ...aiForm, timeOfDay: v })}
-                    >
-                      <SelectTrigger className="h-10">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="breakfast">Breakfast</SelectItem>
-                        <SelectItem value="lunch">Lunch</SelectItem>
-                        <SelectItem value="dinner">Dinner</SelectItem>
-                        <SelectItem value="snack">Snack</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="space-y-1.5">
-                    <Label className="text-xs">People</Label>
-                    <Input
-                      type="number"
-                      min="1"
-                      max="20"
-                      value={aiForm.numPeople}
-                      onChange={(e) => setAiForm({ ...aiForm, numPeople: e.target.value })}
-                      className="h-10"
-                    />
-                  </div>
-                </div>
-
-                <div className="space-y-1.5">
-                  <Label className="text-xs">Additional Preferences</Label>
-                  <Input
-                    value={aiForm.additionalPreferences}
-                    onChange={(e) => setAiForm({ ...aiForm, additionalPreferences: e.target.value })}
-                    placeholder="e.g. quick & easy, comfort food..."
-                    className="h-10"
-                  />
-                </div>
-
-                <Button
-                  onClick={generateSuggestions}
-                  disabled={aiLoading}
-                  className="w-full gap-2"
-                >
-                  {aiLoading ? (
-                    <>
-                      <Loader2 className="w-4 h-4 animate-spin" />
-                      Generating ideas...
-                    </>
-                  ) : (
-                    <>
-                      <Sparkles className="w-4 h-4" />
-                      Generate Suggestions
-                    </>
-                  )}
-                </Button>
-
-                {aiError && (
-                  <div className="p-3 text-sm text-destructive bg-destructive/10 rounded-md">
-                    {aiError}
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-
-            {suggestions.length > 0 && (
-              <div className="space-y-3">
-                <h3 className="text-sm font-semibold text-muted-foreground px-1">
-                  {suggestions.length} suggestions for you
-                </h3>
-                {suggestions.map((s, i) => (
-                  <RecipeCard key={i} recipe={s} onSave={fetchRecipes} />
-                ))}
+          {/* Recently Suggested */}
+          <TabsContent value="recent-ai" className="space-y-3">
+            {cacheLoading ? (
+              Array.from({ length: 3 }).map((_, i) => (
+                <Card key={i} className="border-0 shadow-sm">
+                  <CardContent className="p-4 space-y-2">
+                    <Skeleton className="h-5 w-3/4" />
+                    <Skeleton className="h-3 w-full" />
+                    <Skeleton className="h-3 w-2/3" />
+                  </CardContent>
+                </Card>
+              ))
+            ) : cachedRecipes.length === 0 ? (
+              <div className="text-center py-12">
+                <Sparkles className="w-14 h-14 text-muted-foreground/30 mx-auto mb-3" />
+                <h3 className="font-semibold mb-1">No recent suggestions</h3>
+                <p className="text-sm text-muted-foreground mb-4">
+                  Generate meal ideas using your current inventory
+                </p>
+                <Link href="/meal">
+                  <Button className="gap-2">
+                    <Sparkles className="w-4 h-4" />
+                    Go to Meal tab
+                  </Button>
+                </Link>
               </div>
+            ) : (
+              <>
+                <p className="text-xs text-muted-foreground px-1">
+                  {cachedRecipes.length} recent idea{cachedRecipes.length !== 1 ? "s" : ""} — save any to keep permanently
+                </p>
+                {cachedRecipes.map((recipe) => (
+                  <CachedRecipeCard
+                    key={recipe.id}
+                    recipe={recipe}
+                    onSaved={() => {
+                      fetchMyRecipes()
+                      fetchCachedRecipes()
+                    }}
+                  />
+                ))}
+                <Card className="border-0 shadow-sm bg-purple-50/60">
+                  <CardContent className="p-4 flex items-center justify-between gap-3">
+                    <div className="flex items-center gap-2 min-w-0">
+                      <Sparkles className="w-4 h-4 text-purple-500 shrink-0" />
+                      <p className="text-sm text-purple-800">
+                        Want more ideas? Generate them in the Meal tab.
+                      </p>
+                    </div>
+                    <Link href="/meal">
+                      <Button size="sm" className="shrink-0 bg-purple-600 hover:bg-purple-700 text-white">
+                        Meal tab →
+                      </Button>
+                    </Link>
+                  </CardContent>
+                </Card>
+              </>
             )}
           </TabsContent>
         </Tabs>
@@ -598,3 +494,4 @@ export default function RecipesPage() {
     </div>
   )
 }
+
