@@ -27,7 +27,6 @@ import {
   Package,
   Filter,
   SortAsc,
-  Minus,
   Trash2,
   Pencil,
   Loader2,
@@ -36,6 +35,7 @@ import {
   AlertTriangle,
   TrendingDown,
   ScanLine,
+  ShoppingCart,
 } from "lucide-react"
 
 // ─── Types ───────────────────────────────────────────────────────────────────
@@ -142,13 +142,11 @@ function groupItemsByLocation(items: InventoryItem[], locations: { slug: string;
 function ItemCard({
   item,
   categoryIconSlug,
-  onQuantityChange,
   onDelete,
   onEdit,
 }: {
   item: InventoryItem
   categoryIconSlug: string
-  onQuantityChange: (id: string, delta: number) => void
   onDelete: (id: string) => void
   onEdit: (item: InventoryItem) => void
 }) {
@@ -231,24 +229,9 @@ function ItemCard({
             </div>
 
             <div className="flex items-center justify-between mt-3">
-              <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
-                <button
-                  onClick={() => onQuantityChange(item.id, -1)}
-                  disabled={item.quantity <= 0}
-                  className="w-8 h-8 rounded-full bg-secondary flex items-center justify-center hover:bg-secondary/80 disabled:opacity-50 transition-colors"
-                >
-                  <Minus className="w-3.5 h-3.5" />
-                </button>
-                <span className="text-sm font-bold min-w-[2.5rem] text-center">
-                  {item.quantity % 1 === 0 ? item.quantity : item.quantity.toFixed(1)} {item.unit}
-                </span>
-                <button
-                  onClick={() => onQuantityChange(item.id, 1)}
-                  className="w-8 h-8 rounded-full bg-primary flex items-center justify-center hover:bg-primary/80 transition-colors"
-                >
-                  <Plus className="w-3.5 h-3.5 text-primary-foreground" />
-                </button>
-              </div>
+              <span className="text-sm font-bold text-foreground">
+                {item.quantity % 1 === 0 ? item.quantity : item.quantity.toFixed(1)} {item.unit}
+              </span>
 
               <div className="flex items-center gap-2 shrink-0">
                 {fillPct !== null && (
@@ -776,6 +759,54 @@ function LocationManagerSheet({
   )
 }
 
+// ─── Refill prompt sheet ──────────────────────────────────────────────────────
+
+function RefillPromptSheet({
+  open,
+  itemName,
+  itemBarcode,
+  onConfirm,
+  onDismiss,
+}: {
+  open: boolean
+  itemName: string
+  itemBarcode?: string
+  onConfirm: () => void
+  onDismiss: () => void
+}) {
+  return (
+    <Sheet open={open} onOpenChange={(o) => !o && onDismiss()}>
+      <SheetContent side="bottom">
+        <SheetHeader className="pt-2 pb-4">
+          <SheetTitle className="flex items-center gap-2">
+            <ShoppingCart className="w-5 h-5 text-primary" />
+            Add to shopping list?
+          </SheetTitle>
+        </SheetHeader>
+        <div className="px-4 pb-2">
+          <p className="text-sm text-muted-foreground">
+            Would you like to add <span className="font-semibold text-foreground">{itemName}</span> to your shopping list?
+          </p>
+          {itemBarcode && (
+            <p className="text-xs text-muted-foreground mt-1">
+              When you scan it in, it&apos;ll automatically be checked off.
+            </p>
+          )}
+        </div>
+        <SheetFooter className="px-4 pt-4 pb-6 gap-3 flex-row">
+          <Button variant="outline" className="flex-1" onClick={onDismiss}>
+            No thanks
+          </Button>
+          <Button className="flex-1 gap-2" onClick={onConfirm}>
+            <ShoppingCart className="w-4 h-4" />
+            Add to list
+          </Button>
+        </SheetFooter>
+      </SheetContent>
+    </Sheet>
+  )
+}
+
 // ─── Dashboard ────────────────────────────────────────────────────────────────
 
 export function InventoryDashboard({
@@ -793,6 +824,7 @@ export function InventoryDashboard({
   const [editItem, setEditItem] = useState<InventoryItem | null>(null)
   const [editOpen, setEditOpen] = useState(false)
   const [manageLocationsOpen, setManageLocationsOpen] = useState(false)
+  const [refillPrompt, setRefillPrompt] = useState<{ name: string; barcode?: string; unit?: string } | null>(null)
 
   const userInitials = userName
     .split(" ")
@@ -819,18 +851,6 @@ export function InventoryDashboard({
     return () => clearTimeout(timer)
   }, [fetchItems])
 
-  async function handleQuantityChange(id: string, delta: number) {
-    const item = items.find((i) => i.id === id)
-    if (!item) return
-    const newQuantity = Math.max(0, item.quantity + delta)
-    setItems((prev) => prev.map((i) => i.id === id ? { ...i, quantity: newQuantity } : i))
-    await fetch(`/api/inventory/${id}`, {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ quantity: newQuantity }),
-    })
-  }
-
   async function handleSave(id: string, data: Partial<InventoryItem>) {
     const payload: Record<string, unknown> = { ...data }
     if (!payload.expirationDate) payload.expirationDate = null
@@ -846,10 +866,36 @@ export function InventoryDashboard({
   }
 
   async function handleDelete(id: string) {
+    const item = items.find((i) => i.id === id)
+    if (!item) return
     if (!confirm("Delete this item?")) return
+
+    // Optimistically remove from UI
     setItems((prev) => prev.filter((i) => i.id !== id))
     setEditOpen(false)
+
+    // Delete on server
     await fetch(`/api/inventory/${id}`, { method: "DELETE" })
+
+    // Show refill prompt
+    setRefillPrompt({ name: item.name, barcode: item.barcode, unit: item.unit })
+  }
+
+  async function handleRefillConfirm() {
+    if (!refillPrompt) return
+    await fetch("/api/shopping-list", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        name: refillPrompt.name,
+        quantity: 1,
+        unit: refillPrompt.unit || "count",
+        barcode: refillPrompt.barcode,
+        reason: "REFILL_REQUESTED",
+        reasonDetail: "You requested a refill",
+      }),
+    })
+    setRefillPrompt(null)
   }
 
   function handleEdit(item: InventoryItem) {
@@ -990,7 +1036,6 @@ export function InventoryDashboard({
                       key={item.id}
                       item={item}
                       categoryIconSlug={getCategoryIconSlug(item.category)}
-                      onQuantityChange={handleQuantityChange}
                       onDelete={handleDelete}
                       onEdit={handleEdit}
                     />
@@ -1019,6 +1064,14 @@ export function InventoryDashboard({
           await refetch()
           await fetchItems()
         }}
+      />
+
+      <RefillPromptSheet
+        open={!!refillPrompt}
+        itemName={refillPrompt?.name || ""}
+        itemBarcode={refillPrompt?.barcode}
+        onConfirm={handleRefillConfirm}
+        onDismiss={() => setRefillPrompt(null)}
       />
     </div>
   )

@@ -6,13 +6,13 @@ import { z } from "zod"
 const createRecipeSchema = z.object({
   title: z.string().min(1),
   description: z.string().optional(),
-  ingredients: z.array(z.object({ name: z.string(), amount: z.string() })).default([]),
+  ingredients: z.array(z.object({ name: z.string(), amount: z.string(), inPantry: z.boolean().optional(), pantryItemName: z.string().optional() })).default([]),
   instructions: z.string(),
   servings: z.number().int().positive().default(4),
   prepTimeMin: z.number().int().nonnegative().default(0),
   cookTimeMin: z.number().int().nonnegative().default(0),
   tags: z.array(z.string()).default([]),
-  source: z.enum(["USER", "AI"]).default("USER"),
+  source: z.enum(["USER", "AI", "AI_CACHE"]).default("USER"),
 })
 
 export async function GET(req: NextRequest) {
@@ -21,9 +21,16 @@ export async function GET(req: NextRequest) {
 
   const { searchParams } = new URL(req.url)
   const source = searchParams.get("source")
+  const excludeSource = searchParams.get("excludeSource")
 
   const where: Record<string, unknown> = { userId: session.user.id }
-  if (source) where.source = source
+  if (source) {
+    // Support comma-separated values like source=USER,AI
+    const sources = source.split(",").map((s) => s.trim())
+    where.source = sources.length === 1 ? sources[0] : { in: sources }
+  } else if (excludeSource) {
+    where.source = { not: excludeSource }
+  }
 
   const recipes = await prisma.recipe.findMany({
     where,
