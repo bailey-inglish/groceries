@@ -2,7 +2,6 @@
 
 import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
 import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import {
@@ -16,7 +15,6 @@ import {
   ChefHat,
   Clock,
   Users,
-  Sparkles,
   Loader2,
   RefreshCw,
   Utensils,
@@ -24,6 +22,7 @@ import {
   X,
   Save,
   CheckCircle2,
+  ChevronLeft,
 } from "lucide-react"
 
 // ─── Types ──────────────────────────────────────────────────────────────────
@@ -31,7 +30,8 @@ import {
 type Phase = "setup" | "loading" | "results"
 
 type MealType = "BREAKFAST" | "LUNCH" | "DINNER" | "SNACK"
-type Mood = "fresh" | "comfort" | "bold" | "simple" | "surprise"
+type ServingSize = "solo" | "two" | "group" | "feast"
+type Pref = string
 type TimeOption = 15 | 30 | 60 | 999
 
 interface IngredientMatch {
@@ -55,6 +55,16 @@ interface RecipeSuggestion {
 
 // ─── Constants ──────────────────────────────────────────────────────────────
 
+const ALL_PREF_POOL: Pref[] = [
+  "healthy", "high protein", "low calorie", "comfort food", "adventurous", "quick & easy",
+  "vegetarian", "vegan", "dairy-free", "gluten-free", "spicy", "mild", "light", "hearty",
+  "budget-friendly", "family-friendly", "gourmet", "one-pot", "meal prep", "Mediterranean",
+  "Asian-inspired", "Mexican", "Italian", "American", "sweet",
+]
+
+const LS_ACTIVE_PREFS = "meal_active_prefs"
+const LS_PREF_COUNTS = "meal_pref_counts"
+
 const MEAL_TYPES: Array<{ value: MealType; label: string; emoji: string }> = [
   { value: "BREAKFAST", label: "Breakfast", emoji: "🍳" },
   { value: "LUNCH", label: "Lunch", emoji: "🥗" },
@@ -62,12 +72,11 @@ const MEAL_TYPES: Array<{ value: MealType; label: string; emoji: string }> = [
   { value: "SNACK", label: "Snack", emoji: "🍎" },
 ]
 
-const MOODS: Array<{ value: Mood; label: string; emoji: string }> = [
-  { value: "fresh", label: "Fresh", emoji: "🥗" },
-  { value: "comfort", label: "Comfort", emoji: "🍝" },
-  { value: "bold", label: "Bold", emoji: "🌮" },
-  { value: "simple", label: "Simple", emoji: "🥣" },
-  { value: "surprise", label: "Surprise me", emoji: "🎲" },
+const SERVING_OPTIONS: Array<{ value: ServingSize; label: string; emoji: string; hint: string }> = [
+  { value: "solo", label: "Just me", emoji: "🧑", hint: "1 serving" },
+  { value: "two", label: "For two", emoji: "👫", hint: "2 servings" },
+  { value: "group", label: "Small group", emoji: "👨‍👩‍👧", hint: "3–4 servings" },
+  { value: "feast", label: "Feast", emoji: "🎉", hint: "5+ servings" },
 ]
 
 const TIME_OPTIONS: Array<{ value: TimeOption; label: string; emoji: string }> = [
@@ -405,50 +414,16 @@ function LoadingState({ pantryCount }: { pantryCount: number }) {
   )
 }
 
-// ─── Chip picker ──────────────────────────────────────────────────────────────
-
-function ChipPicker<T extends string | number>({
-  options,
-  value,
-  onChange,
-  required,
-}: {
-  options: Array<{ value: T; label: string; emoji: string }>
-  value: T | null
-  onChange: (v: T) => void
-  required?: boolean
-}) {
-  return (
-    <div className="flex flex-wrap gap-2">
-      {options.map((opt) => {
-        const isSelected = value === opt.value
-        return (
-          <button
-            key={String(opt.value)}
-            onClick={() => onChange(opt.value)}
-            className={`flex items-center gap-1.5 px-3 py-2 rounded-full text-sm font-medium border-2 transition-all ${
-              isSelected
-                ? "border-primary bg-primary text-primary-foreground"
-                : "border-border bg-background hover:border-primary/50"
-            } ${required && !value ? "animate-pulse border-primary/30" : ""}`}
-          >
-            <span>{opt.emoji}</span>
-            <span>{opt.label}</span>
-          </button>
-        )
-      })}
-    </div>
-  )
-}
-
 // ─── Page ────────────────────────────────────────────────────────────────────
 
 export default function MealPage() {
   const [phase, setPhase] = useState<Phase>("setup")
+  const [step, setStep] = useState<1 | 2 | 3 | 4>(1)
   const [mealType, setMealType] = useState<MealType | null>(null)
-  const [mood, setMood] = useState<Mood | null>(null)
+  const [servingSize, setServingSize] = useState<ServingSize | null>(null)
   const [timeLimit, setTimeLimit] = useState<TimeOption | null>(null)
-  const [avoid, setAvoid] = useState("")
+  const [selectedPrefs, setSelectedPrefs] = useState<Pref[]>([])
+  const [activePrefs, setActivePrefs] = useState<Pref[]>([])
   const [results, setResults] = useState<RecipeSuggestion[]>([])
   const [error, setError] = useState("")
   const [pantryCount, setPantryCount] = useState(0)
@@ -472,10 +447,65 @@ export default function MealPage() {
     else setMealType("SNACK")
   }, [])
 
-  const canSubmit = !!mealType
+  // Load active prefs from localStorage on mount
+  useEffect(() => {
+    try {
+      const stored = localStorage.getItem(LS_ACTIVE_PREFS)
+      if (stored) {
+        const parsed: Pref[] = JSON.parse(stored)
+        if (Array.isArray(parsed) && parsed.length === 8) {
+          setActivePrefs(parsed)
+          return
+        }
+      }
+    } catch {
+      // ignore
+    }
+    // Default to first 8 from pool
+    setActivePrefs(ALL_PREF_POOL.slice(0, 8))
+  }, [])
+
+  // ── Rotation logic ─────────────────────────────────────────────────────
+
+  function runRotation(justSelected: Pref[], current: Pref[]) {
+    try {
+      // Increment counts for selected prefs
+      const rawCounts = localStorage.getItem(LS_PREF_COUNTS)
+      const counts: Record<string, number> = rawCounts ? JSON.parse(rawCounts) : {}
+      for (const p of justSelected) {
+        counts[p] = (counts[p] || 0) + 1
+      }
+
+      // Find the 2 with lowest count among current active
+      const sorted = [...current].sort((a, b) => (counts[a] || 0) - (counts[b] || 0))
+      const toSwapOut = sorted.slice(0, 2)
+
+      // Pick 2 random replacements from pool not currently active
+      const candidates = ALL_PREF_POOL.filter((p) => !current.includes(p))
+      const replacements: Pref[] = []
+      const shuffled = [...candidates].sort(() => Math.random() - 0.5)
+      for (const c of shuffled) {
+        if (replacements.length >= 2) break
+        replacements.push(c)
+      }
+
+      // Build new active set
+      let newActive = current.filter((p) => !toSwapOut.includes(p))
+      newActive = [...newActive, ...replacements].slice(0, 8)
+      // Pad back if not enough candidates
+      if (newActive.length < 8) {
+        newActive = [...newActive, ...toSwapOut].slice(0, 8)
+      }
+
+      localStorage.setItem(LS_ACTIVE_PREFS, JSON.stringify(newActive))
+      localStorage.setItem(LS_PREF_COUNTS, JSON.stringify(counts))
+      setActivePrefs(newActive)
+    } catch {
+      // ignore localStorage errors
+    }
+  }
 
   async function handleFind() {
-    if (!canSubmit) return
     setPhase("loading")
     setError("")
 
@@ -484,10 +514,10 @@ export default function MealPage() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          mealType,
-          mood: mood || undefined,
-          maxPrepMinutes: timeLimit !== 999 ? timeLimit : undefined,
-          avoid: avoid.trim() || undefined,
+          mealType: mealType ?? undefined,
+          servingSize: servingSize ?? undefined,
+          maxPrepMinutes: timeLimit !== 999 ? timeLimit ?? undefined : undefined,
+          preferences: selectedPrefs.length > 0 ? selectedPrefs : undefined,
         }),
       })
 
@@ -508,8 +538,10 @@ export default function MealPage() {
 
   function handleReset() {
     setPhase("setup")
+    setStep(1)
     setResults([])
     setError("")
+    setSelectedPrefs([])
     setCookedRecipes(new Set())
   }
 
@@ -532,98 +564,208 @@ export default function MealPage() {
     setCookSheet(null)
   }
 
-  // ── Setup phase ─────────────────────────────────────────────────────────
+  // ── Setup phase (wizard) ────────────────────────────────────────────────
 
   if (phase === "setup") {
+    const progressPct = (step / 4) * 100
+
+    function goBack() {
+      if (step > 1) setStep((s) => (s - 1) as 1 | 2 | 3 | 4)
+    }
+
+    function goNext() {
+      if (step < 4) setStep((s) => (s + 1) as 1 | 2 | 3 | 4)
+    }
+
+    function handleSubmitWizard(prefs: Pref[]) {
+      runRotation(prefs, activePrefs)
+      handleFind()
+    }
+
     return (
       <div className="min-h-screen bg-gray-50">
-        <div className="bg-white border-b sticky top-0 z-10">
-          <div className="max-w-lg mx-auto px-4 py-4">
-            <div className="flex items-center gap-2">
-              <ChefHat className="w-5 h-5 text-primary" />
-              <h1 className="text-lg font-bold">What should I eat?</h1>
-            </div>
-            <p className="text-sm text-muted-foreground mt-0.5">
-              Tell me what you&apos;re in the mood for — I&apos;ll find something from your pantry.
-            </p>
-          </div>
+        {/* Progress bar */}
+        <div className="h-1 bg-gray-200 fixed top-0 left-0 right-0 z-50">
+          <div
+            className="h-full bg-primary transition-all duration-500 ease-out"
+            style={{ width: `${progressPct}%` }}
+          />
         </div>
 
-        <div className="max-w-lg mx-auto px-4 py-6 space-y-6">
-          {pantryCount === 0 && (
-            <Card className="border-0 shadow-sm bg-amber-50">
-              <CardContent className="p-4">
-                <p className="text-sm text-amber-800">
-                  Your pantry is empty! <a href="/scan" className="underline font-medium">Scan some items</a> first so I can find meals you can make.
-                </p>
-              </CardContent>
-            </Card>
-          )}
+        <div className="min-h-screen flex flex-col items-center justify-center px-4 py-16">
+          <div className="w-full max-w-lg">
 
-          {/* Meal type */}
-          <div className="space-y-3">
-            <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">
-              Which meal? <span className="text-red-500">*</span>
-            </h2>
-            <ChipPicker
-              options={MEAL_TYPES}
-              value={mealType}
-              onChange={setMealType}
-              required
-            />
-          </div>
-
-          {/* Mood */}
-          <div className="space-y-3">
-            <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">
-              What&apos;s the vibe?
-            </h2>
-            <ChipPicker
-              options={MOODS}
-              value={mood}
-              onChange={setMood}
-            />
-          </div>
-
-          {/* Time */}
-          <div className="space-y-3">
-            <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">
-              How much time?
-            </h2>
-            <ChipPicker
-              options={TIME_OPTIONS}
-              value={timeLimit}
-              onChange={setTimeLimit}
-            />
-          </div>
-
-          {/* Avoid */}
-          <div className="space-y-2">
-            <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">
-              Anything to avoid today? <span className="text-muted-foreground/50 font-normal normal-case">(optional)</span>
-            </h2>
-            <Input
-              value={avoid}
-              onChange={(e) => setAvoid(e.target.value)}
-              placeholder="e.g. spicy food, onions, heavy meals…"
-              className="h-11"
-            />
-          </div>
-
-          {error && (
-            <div className="p-3 text-sm text-destructive bg-destructive/10 rounded-lg">
-              {error}
+            {/* Top nav row */}
+            <div className="flex items-center justify-between mb-8">
+              <button
+                onClick={goBack}
+                disabled={step === 1}
+                aria-label="Go back"
+                className={`p-2 rounded-full transition-all ${
+                  step === 1
+                    ? "opacity-0 pointer-events-none"
+                    : "hover:bg-gray-100 text-muted-foreground"
+                }`}
+              >
+                <ChevronLeft className="w-5 h-5" />
+              </button>
+              <span className="text-sm text-muted-foreground font-medium tabular-nums">
+                {step} of 4
+              </span>
             </div>
-          )}
 
-          <Button
-            className="w-full h-12 text-base gap-2"
-            onClick={handleFind}
-            disabled={!canSubmit}
-          >
-            <Sparkles className="w-5 h-5" />
-            Find something to eat
-          </Button>
+            {/* ── Step 1: Which meal? ── */}
+            {step === 1 && (
+              <div>
+                <h2 className="text-2xl font-bold mb-1">Which meal?</h2>
+                <p className="text-sm text-muted-foreground mb-6">
+                  Pick what you&apos;re planning to eat.
+                </p>
+                <div className="grid grid-cols-2 gap-3 mb-8">
+                  {MEAL_TYPES.map((opt) => (
+                    <button
+                      key={opt.value}
+                      onClick={() => setMealType(opt.value)}
+                      className={`flex flex-col items-center gap-2 p-5 rounded-xl border-2 transition-all active:scale-95 ${
+                        mealType === opt.value
+                          ? "ring-2 ring-primary border-primary bg-primary/5"
+                          : "border-border bg-white hover:border-primary/50"
+                      }`}
+                    >
+                      <span className="text-3xl">{opt.emoji}</span>
+                      <span className="font-semibold text-sm">{opt.label}</span>
+                    </button>
+                  ))}
+                </div>
+                {error && (
+                  <div className="mb-4 p-3 text-sm text-destructive bg-destructive/10 rounded-lg">
+                    {error}
+                  </div>
+                )}
+                <Button
+                  className="w-full h-12 text-base"
+                  disabled={!mealType}
+                  onClick={goNext}
+                >
+                  Next →
+                </Button>
+              </div>
+            )}
+
+            {/* ── Step 2: How big? ── */}
+            {step === 2 && (
+              <div>
+                <h2 className="text-2xl font-bold mb-1">How big?</h2>
+                <p className="text-sm text-muted-foreground mb-6">
+                  How many people are you cooking for?
+                </p>
+                <div className="grid grid-cols-2 gap-3 mb-8">
+                  {SERVING_OPTIONS.map((opt) => (
+                    <button
+                      key={opt.value}
+                      onClick={() => setServingSize(opt.value)}
+                      className={`flex flex-col items-center gap-2 p-5 rounded-xl border-2 transition-all active:scale-95 ${
+                        servingSize === opt.value
+                          ? "ring-2 ring-primary border-primary bg-primary/5"
+                          : "border-border bg-white hover:border-primary/50"
+                      }`}
+                    >
+                      <span className="text-3xl">{opt.emoji}</span>
+                      <span className="font-semibold text-sm">{opt.label}</span>
+                      <span className="text-xs text-muted-foreground">{opt.hint}</span>
+                    </button>
+                  ))}
+                </div>
+                <Button
+                  className="w-full h-12 text-base"
+                  disabled={!servingSize}
+                  onClick={goNext}
+                >
+                  Next →
+                </Button>
+              </div>
+            )}
+
+            {/* ── Step 3: How long? ── */}
+            {step === 3 && (
+              <div>
+                <h2 className="text-2xl font-bold mb-1">How long?</h2>
+                <p className="text-sm text-muted-foreground mb-6">
+                  How much time do you have to cook?
+                </p>
+                <div className="grid grid-cols-2 gap-3 mb-8">
+                  {TIME_OPTIONS.map((opt) => (
+                    <button
+                      key={opt.value}
+                      onClick={() => setTimeLimit(opt.value)}
+                      className={`flex flex-col items-center gap-2 p-5 rounded-xl border-2 transition-all active:scale-95 ${
+                        timeLimit === opt.value
+                          ? "ring-2 ring-primary border-primary bg-primary/5"
+                          : "border-border bg-white hover:border-primary/50"
+                      }`}
+                    >
+                      <span className="text-3xl">{opt.emoji}</span>
+                      <span className="font-semibold text-sm">{opt.label}</span>
+                    </button>
+                  ))}
+                </div>
+                <Button
+                  className="w-full h-12 text-base"
+                  disabled={!timeLimit}
+                  onClick={goNext}
+                >
+                  Next →
+                </Button>
+              </div>
+            )}
+
+            {/* ── Step 4: Any preferences? ── */}
+            {step === 4 && (
+              <div>
+                <h2 className="text-2xl font-bold mb-1">Any preferences?</h2>
+                <p className="text-sm text-muted-foreground mb-6">
+                  Pick as many as you like, or skip.
+                </p>
+                <div className="grid grid-cols-2 gap-2.5 mb-6">
+                  {activePrefs.map((pref) => {
+                    const isSelected = selectedPrefs.includes(pref)
+                    return (
+                      <button
+                        key={pref}
+                        onClick={() =>
+                          setSelectedPrefs((prev) =>
+                            isSelected
+                              ? prev.filter((p) => p !== pref)
+                              : [...prev, pref]
+                          )
+                        }
+                        className={`px-3 py-3 rounded-xl border-2 text-sm font-medium text-center transition-all active:scale-95 ${
+                          isSelected
+                            ? "ring-2 ring-primary border-primary bg-primary/5"
+                            : "border-border bg-white hover:border-primary/50"
+                        }`}
+                      >
+                        {pref}
+                      </button>
+                    )
+                  })}
+                </div>
+                <Button
+                  className="w-full h-12 text-base gap-2"
+                  onClick={() => handleSubmitWizard(selectedPrefs)}
+                >
+                  Find meals →
+                </Button>
+                <button
+                  className="w-full mt-3 text-sm text-muted-foreground hover:text-foreground transition-colors py-2"
+                  onClick={() => handleSubmitWizard([])}
+                >
+                  Skip →
+                </button>
+              </div>
+            )}
+
+          </div>
         </div>
       </div>
     )

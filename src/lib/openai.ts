@@ -16,9 +16,9 @@ export interface RecipeSuggestionParams {
   additionalPreferences?: string
   // Meal assistant params
   mealType?: string
-  mood?: string
+  servingSize?: string       // e.g. "solo" | "two" | "group" | "feast"
+  preferences?: string[]     // e.g. ["healthy", "high protein"]
   maxPrepMinutes?: number
-  avoid?: string
 }
 
 export interface RecipeSuggestion {
@@ -97,11 +97,11 @@ User preferences:
 - Household size: ${params.householdSize} people
 - Dietary restrictions: ${restrictions}
 ${params.mealType ? `- Meal type: ${params.mealType}` : ""}
-${params.mood ? `- Mood/style: ${params.mood}` : ""}
+${params.servingSize ? `- Serving size: ${params.servingSize === "solo" ? "1 person" : params.servingSize === "two" ? "2 people" : params.servingSize === "group" ? "3-4 people" : "5+ people"}` : ""}
 ${params.maxPrepMinutes ? `- Max prep + cook time: ${params.maxPrepMinutes} minutes` : ""}
 ${params.numPeople ? `- Cooking for: ${params.numPeople} people` : ""}
 ${params.timeOfDay ? `- Time of day: ${params.timeOfDay}` : ""}
-${params.avoid ? `- Avoid today: ${params.avoid}` : ""}
+${params.preferences?.length ? `- Style preferences: ${params.preferences.join(", ")}` : ""}
 ${params.additionalPreferences ? `- Additional preferences: ${params.additionalPreferences}` : ""}
 
 IMPORTANT RULES:

@@ -12,9 +12,9 @@ const suggestSchema = z.object({
   save: z.boolean().default(false),
   // Meal assistant params
   mealType: z.string().optional(),
-  mood: z.string().optional(),
+  servingSize: z.string().optional(),
+  preferences: z.array(z.string()).optional(),
   maxPrepMinutes: z.number().int().positive().optional(),
-  avoid: z.string().optional(),
 })
 
 interface PantryItem {
