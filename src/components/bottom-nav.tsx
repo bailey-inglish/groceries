@@ -7,14 +7,18 @@ import { cn } from "@/lib/utils"
 
 const navItems = [
   { href: "/", icon: Package, label: "Inventory" },
-  { href: "/scan", icon: ScanLine, label: "Scan", highlight: true },
   { href: "/meal", icon: ChefHat, label: "Meal" },
+  { href: "/scan", icon: ScanLine, label: "Scan", highlight: true },
   { href: "/shopping-list", icon: ShoppingCart, label: "List" },
   { href: "/recipes", icon: BookOpen, label: "Recipes" },
 ]
 
 export function BottomNav() {
   const pathname = usePathname()
+
+  if (pathname.startsWith("/onboarding") || pathname.startsWith("/auth/")) {
+    return null
+  }
 
   return (
     <nav className="fixed bottom-0 left-0 right-0 z-50 bg-background border-t border-border pb-safe safe-bottom">
