@@ -81,6 +81,23 @@ interface LocationSection {
   items: InventoryItem[]
 }
 
+async function safeJson<T>(res: Response): Promise<T | null> {
+  const text = await res.text()
+  if (!text) return null
+  try {
+    return JSON.parse(text) as T
+  } catch {
+    return null
+  }
+}
+
+function formatIsoDate(dateInput: string) {
+  const datePart = dateInput.split("T")[0]
+  const [year, month, day] = datePart.split("-")
+  if (!year || !month || !day) return dateInput
+  return `${month}/${day}/${year}`
+}
+
 function normalizeCategoryText(category?: string) {
   return (category || "").toLowerCase().trim()
 }
@@ -247,7 +264,7 @@ function ItemCard({
                 )}
                 {item.expirationDate && !isExpiringSoon && (
                   <span className="text-xs text-muted-foreground">
-                    Exp: {new Date(item.expirationDate).toLocaleDateString()}
+                    Exp: {formatIsoDate(item.expirationDate)}
                   </span>
                 )}
               </div>
@@ -825,6 +842,13 @@ export function InventoryDashboard({
   const [editOpen, setEditOpen] = useState(false)
   const [manageLocationsOpen, setManageLocationsOpen] = useState(false)
   const [refillPrompt, setRefillPrompt] = useState<{ name: string; barcode?: string; unit?: string } | null>(null)
+  const [loadError, setLoadError] = useState("")
+  const [greeting, setGreeting] = useState("Welcome")
+
+  useEffect(() => {
+    const hour = new Date().getHours()
+    setGreeting(hour < 12 ? "Good morning" : hour < 17 ? "Good afternoon" : "Good evening")
+  }, [])
 
   const userInitials = userName
     .split(" ")
@@ -835,15 +859,27 @@ export function InventoryDashboard({
 
   const fetchItems = useCallback(async () => {
     setLoading(true)
+    setLoadError("")
     const params = new URLSearchParams()
     if (search) params.set("search", search)
     if (locationFilter) params.set("location", locationFilter)
     if (sortBy) params.set("sortBy", sortBy)
 
-    const res = await fetch(`/api/inventory?${params}`)
-    const data = await res.json()
-    setItems(data.items || [])
-    setLoading(false)
+    try {
+      const res = await fetch(`/api/inventory?${params}`)
+      const data = await safeJson<{ items?: InventoryItem[]; error?: string }>(res)
+      if (!res.ok) {
+        setItems([])
+        setLoadError(data?.error || "Unable to load inventory right now.")
+        return
+      }
+      setItems(data?.items || [])
+    } catch {
+      setItems([])
+      setLoadError("Unable to load inventory right now.")
+    } finally {
+      setLoading(false)
+    }
   }, [search, locationFilter, sortBy])
 
   useEffect(() => {
@@ -907,9 +943,6 @@ export function InventoryDashboard({
     () => groupItemsByLocation(items, allLocations.length > 0 ? allLocations : locations),
     [items, allLocations, locations]
   )
-
-  const hour = new Date().getHours()
-  const greeting = hour < 12 ? "Good morning" : hour < 17 ? "Good afternoon" : "Good evening"
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -1003,6 +1036,9 @@ export function InventoryDashboard({
           ))
         ) : items.length === 0 ? (
           <div className="text-center py-16">
+            {loadError && (
+              <p className="text-sm text-destructive mb-3">{loadError}</p>
+            )}
             <Package className="w-16 h-16 text-muted-foreground/30 mx-auto mb-4" />
             <h3 className="font-semibold text-lg mb-1">
               {search || locationFilter ? "No items found" : "Your pantry is empty"}

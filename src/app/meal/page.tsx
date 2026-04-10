@@ -64,6 +64,16 @@ interface RecipeGenerationResponse {
   missingIngredients?: string[]
 }
 
+async function safeJson<T>(res: Response): Promise<T | null> {
+  const text = await res.text()
+  if (!text) return null
+  try {
+    return JSON.parse(text) as T
+  } catch {
+    return null
+  }
+}
+
 // ─── Constants ──────────────────────────────────────────────────────────────
 
 const ALL_PREF_POOL: Pref[] = [
@@ -499,7 +509,11 @@ export default function MealPage() {
     let active = true
 
     fetch("/api/inventory?sortBy=updatedAt")
-      .then((r) => r.json())
+      .then(async (r) => {
+        const data = await safeJson<{ items?: unknown[] }>(r)
+        if (!r.ok) return { items: [] }
+        return data || { items: [] }
+      })
       .then((d) => {
         if (!active) return
         setPantryCount(d.items?.length ?? 0)
@@ -603,7 +617,7 @@ export default function MealPage() {
         }),
       })
 
-      const data = (await res.json()) as Partial<RecipeGenerationResponse> & { error?: string; suggestions?: RecipeSuggestion[] }
+      const data = (await safeJson<Partial<RecipeGenerationResponse> & { error?: string; suggestions?: RecipeSuggestion[] }>(res)) || {}
       if (!res.ok) {
         setError(data.error || data.message || "Couldn't generate meal ideas. Try again!")
         setPhase("setup")
@@ -651,7 +665,7 @@ export default function MealPage() {
         // Enforce 10-item cache limit: fetch all AI_CACHE recipes, delete oldest
         try {
           const cacheRes = await fetch("/api/recipes?source=AI_CACHE")
-          const cacheData = await cacheRes.json()
+          const cacheData = (await safeJson<{ recipes?: Array<{ id: string; createdAt: string }> }>(cacheRes)) || { recipes: [] }
           const cached: Array<{ id: string; createdAt: string }> = cacheData.recipes || []
           if (cached.length > 10) {
             const toDelete = cached

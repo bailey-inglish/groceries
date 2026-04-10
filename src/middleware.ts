@@ -48,6 +48,6 @@ export const config = {
      * - api/auth (auth endpoints)
      * - .well-known (certificate files)
      */
-    "/((?!_next/static|_next/image|favicon.ico|public|api/auth|.well-known).*)",
+    "/((?!_next/static|_next/image|favicon.ico|manifest.json|sw.js|icons|public|api/auth|.well-known).*)",
   ],
 }
