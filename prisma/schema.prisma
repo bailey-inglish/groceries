@@ -18,7 +18,7 @@ model User {
   householdSize        Int                @default(1)
   dietaryRestrictions  String             @default("[]")
   openAiKey            String?
-  onboardingCompleted  Boolean            @default(false)
+  onboardingCompleted  Boolean            @default(true)
   shoppingTripLagDays  Int                @default(2)
   createdAt            DateTime           @default(now())
   updatedAt            DateTime           @updatedAt

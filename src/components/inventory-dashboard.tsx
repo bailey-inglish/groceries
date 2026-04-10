@@ -287,7 +287,7 @@ function EditSheet({
         location: form.location,
         expirationDate: form.expirationDate || undefined,
         notes: form.notes || undefined,
-        packageSize: form.packageSize ? parseFloat(form.packageSize) : undefined,
+        packageSize: (() => { const ps = parseFloat(form.packageSize); return form.packageSize && !isNaN(ps) ? ps : undefined })()
         packageUnit: form.packageUnit || undefined,
         isOpened: form.isOpened,
       })

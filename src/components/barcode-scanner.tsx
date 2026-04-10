@@ -15,6 +15,7 @@ function NativeScanner({ onScan, onError }: BarcodeScannerProps) {
   const streamRef = useRef<MediaStream | null>(null)
   const rafRef = useRef<number>(0)
   const lastCodeRef = useRef<string>("")
+  const detectorRef = useRef<{ detect: (img: HTMLCanvasElement) => Promise<Array<{ rawValue: string }>> } | null>(null)
   const [status, setStatus] = useState<"loading" | "running" | "error">("loading")
   const [errorMsg, setErrorMsg] = useState("")
 
@@ -34,20 +35,7 @@ function NativeScanner({ onScan, onError }: BarcodeScannerProps) {
     ctx.drawImage(video, 0, 0)
 
     try {
-      type BarcodeDetectorType = {
-        detect: (img: HTMLCanvasElement) => Promise<Array<{ rawValue: string }>>
-      }
-      type WindowWithBarcodeDetector = Window & {
-        BarcodeDetector: new (opts: { formats: string[] }) => BarcodeDetectorType
-      }
-      const detector = new (window as unknown as WindowWithBarcodeDetector).BarcodeDetector({
-        formats: [
-          "ean_13", "ean_8", "upc_a", "upc_e",
-          "code_39", "code_128", "qr_code", "data_matrix",
-          "codabar", "itf",
-        ],
-      })
-      const barcodes = await detector.detect(canvas)
+      const barcodes = await detectorRef.current!.detect(canvas)
       if (barcodes.length > 0) {
         const code = barcodes[0].rawValue
         if (code && code !== lastCodeRef.current) {
@@ -66,6 +54,21 @@ function NativeScanner({ onScan, onError }: BarcodeScannerProps) {
 
   useEffect(() => {
     let mounted = true
+
+    // Create the BarcodeDetector instance once and reuse it across frames
+    type BarcodeDetectorType = {
+      detect: (img: HTMLCanvasElement) => Promise<Array<{ rawValue: string }>>
+    }
+    type WindowWithBarcodeDetector = Window & {
+      BarcodeDetector: new (opts: { formats: string[] }) => BarcodeDetectorType
+    }
+    detectorRef.current = new (window as unknown as WindowWithBarcodeDetector).BarcodeDetector({
+      formats: [
+        "ean_13", "ean_8", "upc_a", "upc_e",
+        "code_39", "code_128", "qr_code", "data_matrix",
+        "codabar", "itf",
+      ],
+    })
 
     async function start() {
       try {

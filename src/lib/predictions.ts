@@ -16,7 +16,8 @@ export interface PredictionResult {
  * Exponential Moving Average of daily consumption.
  *
  * More recent consumption events are weighted more heavily than older ones.
- * α = 0.3 gives ~70% weight to the last 7 data points.
+ * α = 0.3 gives ~92% cumulative weight to the most recent 7 data points
+ * (1 - 0.7^7 ≈ 0.92).
  */
 function computeEMA(values: number[], alpha = 0.3): number {
   if (values.length === 0) return 0
@@ -59,7 +60,9 @@ export async function calculatePredictions(
       }
     }
 
-    // Build daily consumption buckets from SCAN_OUT events
+    // Build daily consumption buckets from SCAN_OUT events.
+    // NOTE: createdAt is bucketed by UTC date; events near midnight in non-UTC
+    // timezones may land in the adjacent UTC day. Predictions remain approximate.
     const dailyBuckets: Map<string, number> = new Map()
     for (const ev of scanOuts) {
       const day = ev.createdAt.toISOString().split("T")[0]

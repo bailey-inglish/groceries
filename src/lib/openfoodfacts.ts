@@ -44,7 +44,8 @@ export async function lookupProduct(barcode: string): Promise<ProductData | null
     // Parse package size from product_quantity (e.g. "500 g", "2 L", "12")
     let packageSize: number | undefined
     let packageUnit: string | undefined
-    const rawQty: string = product.product_quantity || product.quantity || ""
+    // product_quantity / quantity can be numeric in some API responses — coerce to string
+    const rawQty: string = String(product.product_quantity || product.quantity || "")
     if (rawQty) {
       const parsed = parsePackageSize(rawQty)
       if (parsed) {

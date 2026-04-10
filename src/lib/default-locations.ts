@@ -1,0 +1,13 @@
+// Canonical list of default storage locations.
+// This file has no server-only imports so it can be used in both client and
+// server code (e.g. onboarding UI and location-seeding utilities).
+
+export const DEFAULT_LOCATIONS = [
+  { name: "Fridge", slug: "FRIDGE", color: "bg-blue-100 text-blue-800", sortOrder: 0 },
+  { name: "Freezer", slug: "FREEZER", color: "bg-cyan-100 text-cyan-800", sortOrder: 1 },
+  { name: "Pantry", slug: "PANTRY", color: "bg-amber-100 text-amber-800", sortOrder: 2 },
+  { name: "Spice Rack", slug: "SPICE_RACK", color: "bg-orange-100 text-orange-800", sortOrder: 3 },
+  { name: "Counter", slug: "COUNTER", color: "bg-purple-100 text-purple-800", sortOrder: 4 },
+  { name: "Cellar", slug: "CELLAR", color: "bg-stone-100 text-stone-800", sortOrder: 5 },
+  { name: "Other", slug: "OTHER", color: "bg-gray-100 text-gray-800", sortOrder: 6 },
+]

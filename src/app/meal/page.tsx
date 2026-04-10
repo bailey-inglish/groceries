@@ -64,6 +64,7 @@ const ALL_PREF_POOL: Pref[] = [
 
 const LS_ACTIVE_PREFS = "meal_active_prefs"
 const LS_PREF_COUNTS = "meal_pref_counts"
+const LS_SEEN_PREFS = "meal_seen_prefs"
 
 const MEAL_TYPES: Array<{ value: MealType; label: string; emoji: string }> = [
   { value: "BREAKFAST", label: "Breakfast", emoji: "🍳" },
@@ -480,13 +481,25 @@ export default function MealPage() {
       const sorted = [...current].sort((a, b) => (counts[a] || 0) - (counts[b] || 0))
       const toSwapOut = sorted.slice(0, 2)
 
-      // Pick 2 random replacements from pool not currently active
-      const candidates = ALL_PREF_POOL.filter((p) => !current.includes(p))
+      // Track seen prefs so replacements are drawn from truly unseen options
+      const rawSeen = localStorage.getItem(LS_SEEN_PREFS)
+      const seen: Set<Pref> = new Set(rawSeen ? JSON.parse(rawSeen) : current)
+
+      // Pick 2 replacements: prefer unseen prefs; if exhausted, fall back to
+      // any pref not currently active (and reset the seen set)
+      let unseen = ALL_PREF_POOL.filter((p) => !current.includes(p) && !seen.has(p))
+      if (unseen.length < 2) {
+        // Pool of unseen options is exhausted — reset seen tracking
+        seen.clear()
+        unseen = ALL_PREF_POOL.filter((p) => !current.includes(p))
+      }
+
       const replacements: Pref[] = []
-      const shuffled = [...candidates].sort(() => Math.random() - 0.5)
+      const shuffled = [...unseen].sort(() => Math.random() - 0.5)
       for (const c of shuffled) {
         if (replacements.length >= 2) break
         replacements.push(c)
+        seen.add(c)
       }
 
       // Build new active set
@@ -497,8 +510,12 @@ export default function MealPage() {
         newActive = [...newActive, ...toSwapOut].slice(0, 8)
       }
 
+      // Mark the entire new active set as seen
+      for (const p of newActive) seen.add(p)
+
       localStorage.setItem(LS_ACTIVE_PREFS, JSON.stringify(newActive))
       localStorage.setItem(LS_PREF_COUNTS, JSON.stringify(counts))
+      localStorage.setItem(LS_SEEN_PREFS, JSON.stringify([...seen]))
       setActivePrefs(newActive)
     } catch {
       // ignore localStorage errors

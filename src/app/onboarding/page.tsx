@@ -19,6 +19,7 @@ import {
   Loader2,
   CheckCircle,
 } from "lucide-react"
+import { DEFAULT_LOCATIONS } from "@/lib/default-locations"
 
 const DIETARY_OPTIONS = [
   { id: "vegetarian", label: "Vegetarian", emoji: "🥦" },
@@ -30,15 +31,16 @@ const DIETARY_OPTIONS = [
   { id: "kosher", label: "Kosher", emoji: "✡️" },
 ]
 
-const DEFAULT_LOCATIONS = [
-  { slug: "FRIDGE", name: "Fridge", emoji: "🧊", color: "bg-blue-100 text-blue-800" },
-  { slug: "FREEZER", name: "Freezer", emoji: "❄️", color: "bg-cyan-100 text-cyan-800" },
-  { slug: "PANTRY", name: "Pantry", emoji: "🏠", color: "bg-amber-100 text-amber-800" },
-  { slug: "SPICE_RACK", name: "Spice Rack", emoji: "🌶️", color: "bg-orange-100 text-orange-800" },
-  { slug: "COUNTER", name: "Counter", emoji: "🪴", color: "bg-purple-100 text-purple-800" },
-  { slug: "CELLAR", name: "Cellar", emoji: "🍷", color: "bg-stone-100 text-stone-800" },
-  { slug: "OTHER", name: "Other", emoji: "📦", color: "bg-gray-100 text-gray-800" },
-]
+// Display-only emoji mapping for the onboarding UI
+const LOCATION_EMOJIS: Record<string, string> = {
+  FRIDGE: "🧊",
+  FREEZER: "❄️",
+  PANTRY: "🏠",
+  SPICE_RACK: "🌶️",
+  COUNTER: "🪴",
+  CELLAR: "🍷",
+  OTHER: "📦",
+}
 
 export default function OnboardingPage() {
   const router = useRouter()
@@ -245,7 +247,7 @@ export default function OnboardingPage() {
                       : "border-transparent bg-white/50 shadow-sm opacity-50"
                   }`}
                 >
-                  <span className="text-lg">{loc.emoji}</span>
+                  <span className="text-lg">{LOCATION_EMOJIS[loc.slug] ?? "📦"}</span>
                   <span className="text-sm font-medium flex-1">{loc.name}</span>
                   {visibleSlugs.includes(loc.slug) && <CheckCircle className="w-4 h-4 text-primary shrink-0" />}
                 </button>

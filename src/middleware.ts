@@ -27,7 +27,9 @@ export default auth((req) => {
 
   // Gate non-onboarding pages behind onboarding completion.
   // onboardingCompleted is stored in the JWT token (set in auth.ts).
-  if (!isOnboardingPage) {
+  // API routes are excluded — they return JSON 401/400 directly from route handlers.
+  const isApiRoute = nextUrl.pathname.startsWith("/api")
+  if (!isOnboardingPage && !isApiRoute) {
     const sessionUser = req.auth?.user as { id?: string; onboardingCompleted?: boolean } | undefined
     if (sessionUser?.onboardingCompleted === false) {
       return NextResponse.redirect(new URL("/onboarding", nextUrl))

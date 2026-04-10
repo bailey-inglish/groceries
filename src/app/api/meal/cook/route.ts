@@ -77,7 +77,7 @@ export async function POST(req: NextRequest) {
       data: {
         userId,
         inventoryItemId: match.id,
-        eventType: "MEAL_PLANNED",
+        eventType: "MEAL_COOKED",
         quantityChange: -deductAmount,
         quantityBefore,
         quantityAfter: newQuantity,
